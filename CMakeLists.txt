@@ -298,7 +298,6 @@ option(GLFW_LOCATION "Path to GLFW" "")
 option(MAYA_LOCATION "Path to Maya" "")
 
 option(NO_LIB "Disable the opensubdiv libs build (caveat emptor)" OFF)
-option(NO_EXAMPLES "Disable examples build" OFF)
 option(NO_TUTORIALS "Disable tutorials build" OFF)
 option(NO_REGRESSION "Disable regression tests build" OFF)
 option(NO_MAYA "Disable Maya plugin build" OFF)
@@ -749,10 +748,6 @@ add_subdirectory(opensubdiv)
 
 if (NOT ANDROID AND NOT IOS) # XXXdyu
     add_subdirectory(regression)
-endif()
-
-if (NOT NO_EXAMPLES)
-    add_subdirectory(examples)
 endif()
 
 if (NOT NO_TUTORIALS)

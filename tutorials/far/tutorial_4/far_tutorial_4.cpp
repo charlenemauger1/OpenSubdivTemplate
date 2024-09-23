@@ -93,7 +93,7 @@ using namespace OpenSubdiv;
 
 Far::TopologyRefiner* createTopologyRefiner(float* g_verts, const char* input_file);
 
-void export_subdivived_mesh(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts);
+void export_subdivived_mesh_and_matrix(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts, const char* output_sub_matrix);
 
 //------------------------------------------------------------------------------
 int main(int, char**) {
@@ -105,14 +105,15 @@ int main(int, char**) {
 	// Move to config
 	int maxlevel = 2; // 2 subdivision levels
 	const char* input_file = "C:\\Users\\charl\\Desktop\\bi-a_model.obj";
-	const char* output_mesh = "C:\\Users\\charl\\Desktop\\bi-a_model-sub.obj";
+	const char* output_mesh = "C:\\Users\\charl\\Desktop\\bi-a_model-sub-2.obj";
+	const char* subdivision_matrix = "C:\\Users\\charl\\Desktop\\subdiv_matrix.txt";
 
 	Far::TopologyRefiner* refiner = createTopologyRefiner(g_verts, input_file);
 
 	refiner->RefineUniform(Far::TopologyRefiner::UniformOptions(maxlevel));   // Refine the topology RefineUniform
 	cout << "refinement " << endl;
 
-	export_subdivived_mesh(refiner, output_mesh, g_verts);
+	export_subdivived_mesh_and_matrix(refiner, output_mesh, g_verts, subdivision_matrix);
 
 	// PatchTable
 	// ---------------------
@@ -309,12 +310,10 @@ int main(int, char**) {
 	options.generateOffsets = true;
 	Far::StencilTable const* stencilTable = Far::StencilTableFactory::Create(*refiner, options);
 
-	ofstream mytable;
-	mytable.open("C:\\Users\\charl\\Desktop\\StencilTableessai.obj");
 
 	// Stencil Table without Patches
 
-	const int num_vertices = stencilTable->GetNumControlVertices();
+	/*const int num_vertices = stencilTable->GetNumControlVertices();
 	const int num_stencil = stencilTable->GetNumStencils();
 	const float* weights;
 	Far::Stencil Stencil;
@@ -356,7 +355,7 @@ int main(int, char**) {
 		mytable << endl;
 
 	}
-	mytable.close();
+	mytable.close();*/
 
 
 	delete refiner;
@@ -366,16 +365,69 @@ int main(int, char**) {
 
 //------------------------------------------------------------------------------
 
-void export_subdivived_mesh(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts)
+void export_subdivived_mesh_and_matrix(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts, const char* output_sub_matrix)
 {	
 	ofstream output_file;
 	output_file.open(output_obj);
+
+
+	ofstream matrix_file;
+	matrix_file.open(output_sub_matrix);
+
 
 	Far::StencilTableFactory::Options options;
 	options.generateIntermediateLevels = false;
 	options.generateOffsets = true;
 	Far::StencilTable const* stencil_table = Far::StencilTableFactory::Create(*refiner, options);
 
+
+	// export matrix
+	const int num_vertices = stencil_table->GetNumControlVertices();
+	const int num_stencil = stencil_table->GetNumStencils();
+	const float* weights;
+	Far::Stencil stencil;
+	const Far::Index* indices;
+	std::cout << "Export subdivision matrix" << endl;
+	float** array = new float*[num_stencil];
+	for (int i = 0; i < num_stencil; ++i)
+		array[i] = new float[num_vertices];
+
+
+	// initialization
+	for (int i = 0; i < num_stencil; ++i)
+		for (int j = 0; j < num_vertices; ++j)
+			array[i][j] = 0.0;
+
+
+	for (int i = 0; i < stencil_table->GetNumStencils(); i++)
+	{
+		stencil = stencil_table->GetStencil((Far::Index)(i));
+		int size = stencil.GetSize();
+		indices = stencil.GetVertexIndices();
+		weights = stencil.GetWeights();
+
+		for (int j = 0; j < size; j++)
+		{
+			int m = (int)(indices[j]);
+			array[i][m] = weights[j];
+		}
+
+	}
+
+	for (int i = 0; i < stencil_table->GetNumStencils(); i++)
+	{
+		for (int j = 0; j < num_vertices; j++)
+		{
+			matrix_file << array[i][j] << ' ';
+		}
+
+		matrix_file << endl;
+
+	}
+	matrix_file.close();
+
+
+	// export mesh
 	// Allocate vertex primvar buffer (1 stencil for each vertex)
 	int nstencils = stencil_table->GetNumStencils();
 	std::vector<Vertex> vertexBuffer(nstencils);
