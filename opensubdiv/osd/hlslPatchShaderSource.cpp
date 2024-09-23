@@ -36,21 +36,6 @@ namespace Osd {
 static const char *commonShaderSource =
 #include "hlslPatchCommon.gen.h"
 ;
-static const char *commonTessShaderSource =
-#include "hlslPatchCommonTess.gen.h"
-;
-static const char *patchLegacyShaderSource =
-#include "hlslPatchLegacy.gen.h"
-;
-static const char *patchBasisTypesShaderSource =
-#include "patchBasisTypes.gen.h"
-;
-static const char *patchBasisShaderSource =
-#include "patchBasis.gen.h"
-;
-static const char *boxSplineTriangleShaderSource =
-#include "hlslPatchBoxSplineTriangle.gen.h"
-;
 static const char *bsplineShaderSource =
 #include "hlslPatchBSpline.gen.h"
 ;
@@ -60,38 +45,11 @@ static const char *gregoryShaderSource =
 static const char *gregoryBasisShaderSource =
 #include "hlslPatchGregoryBasis.gen.h"
 ;
-static const char *gregoryTriangleShaderSource =
-#include "hlslPatchGregoryTriangle.gen.h"
-;
-
-/*static*/
-std::string
-HLSLPatchShaderSource::GetPatchDrawingShaderSource() {
-    std::stringstream ss;
-    ss << std::string(commonShaderSource);
-    ss << std::string(commonTessShaderSource);
-    return ss.str();
-}
 
 /*static*/
 std::string
 HLSLPatchShaderSource::GetCommonShaderSource() {
-    std::stringstream ss;
-    ss << GetPatchDrawingShaderSource();
-    ss << std::string(patchLegacyShaderSource);
-    return ss.str();
-}
-
-/*static*/
-std::string
-HLSLPatchShaderSource::GetPatchBasisShaderSource() {
-    std::stringstream ss;
-#if defined(OPENSUBDIV_GREGORY_EVAL_TRUE_DERIVATIVES)
-    ss << "#define OPENSUBDIV_GREGORY_EVAL_TRUE_DERIVATIVES\n";
-#endif
-    ss << std::string(patchBasisTypesShaderSource);
-    ss << std::string(patchBasisShaderSource);
-    return ss.str();
+    return std::string(commonShaderSource);
 }
 
 /*static*/
@@ -100,8 +58,6 @@ HLSLPatchShaderSource::GetVertexShaderSource(Far::PatchDescriptor::Type type) {
     switch (type) {
     case Far::PatchDescriptor::REGULAR:
         return bsplineShaderSource;
-    case Far::PatchDescriptor::LOOP:
-        return boxSplineTriangleShaderSource;
     case Far::PatchDescriptor::GREGORY:
         return gregoryShaderSource;
     case Far::PatchDescriptor::GREGORY_BOUNDARY:
@@ -109,8 +65,6 @@ HLSLPatchShaderSource::GetVertexShaderSource(Far::PatchDescriptor::Type type) {
              + std::string(gregoryShaderSource);
     case Far::PatchDescriptor::GREGORY_BASIS:
         return gregoryBasisShaderSource;
-    case Far::PatchDescriptor::GREGORY_TRIANGLE:
-        return gregoryTriangleShaderSource;
     default:
         break;  // returns empty (points, lines, quads, ...)
     }
@@ -123,8 +77,6 @@ HLSLPatchShaderSource::GetHullShaderSource(Far::PatchDescriptor::Type type) {
     switch (type) {
     case Far::PatchDescriptor::REGULAR:
         return bsplineShaderSource;
-    case Far::PatchDescriptor::LOOP:
-        return boxSplineTriangleShaderSource;
     case Far::PatchDescriptor::GREGORY:
         return gregoryShaderSource;
     case Far::PatchDescriptor::GREGORY_BOUNDARY:
@@ -132,8 +84,6 @@ HLSLPatchShaderSource::GetHullShaderSource(Far::PatchDescriptor::Type type) {
              + std::string(gregoryShaderSource);
     case Far::PatchDescriptor::GREGORY_BASIS:
         return gregoryBasisShaderSource;
-    case Far::PatchDescriptor::GREGORY_TRIANGLE:
-        return gregoryTriangleShaderSource;
     default:
         break;  // returns empty (points, lines, quads, ...)
     }
@@ -146,8 +96,6 @@ HLSLPatchShaderSource::GetDomainShaderSource(Far::PatchDescriptor::Type type) {
     switch (type) {
     case Far::PatchDescriptor::REGULAR:
         return bsplineShaderSource;
-    case Far::PatchDescriptor::LOOP:
-        return boxSplineTriangleShaderSource;
     case Far::PatchDescriptor::GREGORY:
         return gregoryShaderSource;
     case Far::PatchDescriptor::GREGORY_BOUNDARY:
@@ -155,8 +103,6 @@ HLSLPatchShaderSource::GetDomainShaderSource(Far::PatchDescriptor::Type type) {
              + std::string(gregoryShaderSource);
     case Far::PatchDescriptor::GREGORY_BASIS:
         return gregoryBasisShaderSource;
-    case Far::PatchDescriptor::GREGORY_TRIANGLE:
-        return gregoryTriangleShaderSource;
     default:
         break;  // returns empty (points, lines, quads, ...)
     }

@@ -21,33 +21,17 @@
 #   KIND, either express or implied. See the Apache License for the specific
 #   language governing permissions and limitations under the Apache License.
 #
-macro(osd_add_far_tutorial NAME)
-
-     osd_add_executable(${NAME} "tutorials/far"
-        ${ARGN}
-        $<TARGET_OBJECTS:sdc_obj>
-        $<TARGET_OBJECTS:vtr_obj>
-        $<TARGET_OBJECTS:far_obj>
-     )
-
-     install(TARGETS ${NAME} DESTINATION "${CMAKE_BINDIR_BASE}/tutorials")
-
-endmacro()
-
 
 set(TUTORIALS
-    tutorial_1_1
-    tutorial_1_2
-    tutorial_2_1
-    tutorial_2_2
-    tutorial_2_3
-    tutorial_3_1
-    tutorial_4_1
-    tutorial_4_2
-    tutorial_4_3
-    tutorial_5_1
-    tutorial_5_2
-    tutorial_5_3
+    tutorial_0
+    tutorial_1
+    tutorial_2
+    tutorial_3
+    tutorial_4
+    tutorial_5
+    tutorial_6
+    tutorial_7
+    tutorial_8
 )
 
 foreach(tutorial ${TUTORIALS})
@@ -61,8 +45,3 @@ foreach(tutorial ${TUTORIALS})
 endforeach()
 
 add_custom_target(far_tutorials DEPENDS ${TUTORIAL_TARGETS})
-
-set_target_properties(far_tutorials
-    PROPERTIES 
-        FOLDER "tutorials/far"
-)

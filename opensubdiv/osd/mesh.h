@@ -50,15 +50,11 @@ enum MeshBits {
     MeshAdaptive             = 0,
     MeshInterleaveVarying    = 1,
     MeshFVarData             = 2,
-    MeshFVarAdaptive         = 3,
-    MeshUseSmoothCornerPatch = 4,
-    MeshUseSingleCreasePatch = 5,
-    MeshUseInfSharpPatch     = 6,
-    MeshEndCapBilinearBasis  = 7,  // exclusive
-    MeshEndCapBSplineBasis   = 8,  // exclusive
-    MeshEndCapGregoryBasis   = 9,  // exclusive
-    MeshEndCapLegacyGregory  = 10, // exclusive
-    NUM_MESH_BITS            = 11,
+    MeshUseSingleCreasePatch = 3,
+    MeshEndCapBSplineBasis   = 4,  // exclusive
+    MeshEndCapGregoryBasis   = 5,  // exclusive
+    MeshEndCapLegacyGregory  = 6,  // exclusive
+    NUM_MESH_BITS            = 7,
 };
 typedef std::bitset<NUM_MESH_BITS> MeshBitset;
 
@@ -114,23 +110,6 @@ protected:
             refiner.RefineUniform(options);
         }
     }
-    static inline void refineMesh(Far::TopologyRefiner & refiner,
-                                  int level, MeshBitset bits) {
-        if (bits.test(MeshAdaptive)) {
-            Far::TopologyRefiner::AdaptiveOptions options(level);
-            options.useSingleCreasePatch = bits.test(MeshUseSingleCreasePatch);
-            options.useInfSharpPatch = bits.test(MeshUseInfSharpPatch);
-            options.considerFVarChannels = bits.test(MeshFVarAdaptive);
-            refiner.RefineAdaptive(options);
-        } else {
-            //  This dependency on FVar channels should not be necessary
-            bool fullTopologyInLastLevel = refiner.GetNumFVarChannels()>0;
-
-            Far::TopologyRefiner::UniformOptions options(level);
-            options.fullTopologyInLastLevel = fullTopologyInLastLevel;
-            refiner.RefineUniform(options);
-        }
-    }
 };
 
 // ---------------------------------------------------------------------------
@@ -140,7 +119,7 @@ template <typename STENCIL_TABLE, typename SRC_STENCIL_TABLE,
 STENCIL_TABLE const *
 convertToCompatibleStencilTable(
     SRC_STENCIL_TABLE const *table, DEVICE_CONTEXT *context) {
-    if (! table) return NULL;
+    if (not table) return NULL;
     return STENCIL_TABLE::Create(table, context);
 }
 
@@ -150,7 +129,7 @@ convertToCompatibleStencilTable<Far::StencilTable, Far::StencilTable, void>(
     Far::StencilTable const *table, void *  /*context*/) {
     // no need for conversion
     // XXX: We don't want to even copy.
-    if (! table) return NULL;
+    if (not table) return NULL;
     return new Far::StencilTable(*table);
 }
 
@@ -160,7 +139,7 @@ convertToCompatibleStencilTable<Far::LimitStencilTable, Far::LimitStencilTable, 
     Far::LimitStencilTable const *table, void *  /*context*/) {
     // no need for conversion
     // XXX: We don't want to even copy.
-    if (! table) return NULL;
+    if (not table) return NULL;
     return new Far::LimitStencilTable(*table);
 }
 
@@ -170,14 +149,14 @@ convertToCompatibleStencilTable<Far::StencilTable, Far::StencilTable, ID3D11Devi
     Far::StencilTable const *table, ID3D11DeviceContext *  /*context*/) {
     // no need for conversion
     // XXX: We don't want to even copy.
-    if (! table) return NULL;
+    if (not table) return NULL;
     return new Far::StencilTable(*table);
 }
 
 // ---------------------------------------------------------------------------
 
 // Osd evaluator cache: for the GPU backends require compiled instance
-//   (GLXFB, GLCompute, CL)
+//   (GLXFB, GLCompue, CL)
 //
 // note: this is just an example usage and client applications are supposed
 //       to implement their own structure for Evaluator instance.
@@ -199,27 +178,8 @@ public:
               BufferDescriptor const &duDescArg,
               BufferDescriptor const &dvDescArg,
               EVALUATOR *evalArg) : srcDesc(srcDescArg), dstDesc(dstDescArg),
-                              duDesc(duDescArg), dvDesc(dvDescArg),
-                              duuDesc(BufferDescriptor()),
-                              duvDesc(BufferDescriptor()),
-                              dvvDesc(BufferDescriptor()),
-                              evaluator(evalArg) {}
-        Entry(BufferDescriptor const &srcDescArg,
-              BufferDescriptor const &dstDescArg,
-              BufferDescriptor const &duDescArg,
-              BufferDescriptor const &dvDescArg,
-              BufferDescriptor const &duuDescArg,
-              BufferDescriptor const &duvDescArg,
-              BufferDescriptor const &dvvDescArg,
-              EVALUATOR *evalArg) : srcDesc(srcDescArg), dstDesc(dstDescArg),
-                              duDesc(duDescArg), dvDesc(dvDescArg),
-                              duuDesc(duuDescArg),
-                              duvDesc(duvDescArg),
-                              dvvDesc(dvvDescArg),
-                              evaluator(evalArg) {}
-        BufferDescriptor srcDesc, dstDesc;
-        BufferDescriptor duDesc, dvDesc;
-        BufferDescriptor duuDesc, duvDesc, dvvDesc;
+                              duDesc(duDescArg), dvDesc(dvDescArg), evaluator(evalArg) {}
+        BufferDescriptor srcDesc, dstDesc, duDesc, dvDesc;
         EVALUATOR *evaluator;
     };
     typedef std::vector<Entry> Evaluators;
@@ -231,9 +191,6 @@ public:
         return GetEvaluator(srcDesc, dstDesc,
                             BufferDescriptor(),
                             BufferDescriptor(),
-                            BufferDescriptor(),
-                            BufferDescriptor(),
-                            BufferDescriptor(),
                             deviceContext);
     }
 
@@ -242,44 +199,21 @@ public:
                             BufferDescriptor const &dstDesc,
                             BufferDescriptor const &duDesc,
                             BufferDescriptor const &dvDesc,
-                            DEVICE_CONTEXT *deviceContext) {
-        return GetEvaluator(srcDesc, dstDesc,
-                            duDesc, dvDesc,
-                            BufferDescriptor(),
-                            BufferDescriptor(),
-                            BufferDescriptor(),
-                            deviceContext);
-    }
-
-    template <typename DEVICE_CONTEXT>
-    EVALUATOR *GetEvaluator(BufferDescriptor const &srcDesc,
-                            BufferDescriptor const &dstDesc,
-                            BufferDescriptor const &duDesc,
-                            BufferDescriptor const &dvDesc,
-                            BufferDescriptor const &duuDesc,
-                            BufferDescriptor const &duvDesc,
-                            BufferDescriptor const &dvvDesc,
                             DEVICE_CONTEXT *deviceContext) {
 
         for(typename Evaluators::iterator it = _evaluators.begin();
             it != _evaluators.end(); ++it) {
             if (isEqual(srcDesc, it->srcDesc) &&
                 isEqual(dstDesc, it->dstDesc) &&
-                isEqual(duDesc,  it->duDesc) &&
-                isEqual(dvDesc,  it->dvDesc) &&
-                isEqual(duuDesc, it->duuDesc) &&
-                isEqual(duvDesc, it->duvDesc) &&
-                isEqual(dvvDesc, it->dvvDesc)) {
+                isEqual(duDesc, it->duDesc) &&
+                isEqual(dvDesc, it->dvDesc)) {
                 return it->evaluator;
             }
         }
         EVALUATOR *e = EVALUATOR::Create(srcDesc, dstDesc,
                                          duDesc, dvDesc,
-                                         duuDesc, duvDesc, dvvDesc,
                                          deviceContext);
-        _evaluators.push_back(Entry(srcDesc, dstDesc,
-                                    duDesc, dvDesc,
-                                    duuDesc, duvDesc, dvvDesc, e));
+        _evaluators.push_back(Entry(srcDesc, dstDesc, duDesc, dvDesc, e));
         return e;
     }
 
@@ -326,25 +260,6 @@ static EVALUATOR *GetEvaluator(
     BufferDescriptor const &dstDesc,
     BufferDescriptor const &duDesc,
     BufferDescriptor const &dvDesc,
-    BufferDescriptor const &duuDesc,
-    BufferDescriptor const &duvDesc,
-    BufferDescriptor const &dvvDesc,
-    DEVICE_CONTEXT deviceContext,
-    typename enable_if<instantiatable<EVALUATOR>::value, void>::type*t=0) {
-    (void)t;
-    if (cache == NULL) return NULL;
-    return cache->GetEvaluator(srcDesc, dstDesc,
-                               duDesc, dvDesc, duuDesc, duvDesc, dvvDesc,
-                               deviceContext);
-}
-
-template <typename EVALUATOR, typename DEVICE_CONTEXT>
-static EVALUATOR *GetEvaluator(
-    EvaluatorCacheT<EVALUATOR> *cache,
-    BufferDescriptor const &srcDesc,
-    BufferDescriptor const &dstDesc,
-    BufferDescriptor const &duDesc,
-    BufferDescriptor const &dvDesc,
     DEVICE_CONTEXT deviceContext,
     typename enable_if<instantiatable<EVALUATOR>::value, void>::type*t=0) {
     (void)t;
@@ -368,22 +283,6 @@ static EVALUATOR *GetEvaluator(
 }
 
 // fallback
-template <typename EVALUATOR, typename DEVICE_CONTEXT>
-static EVALUATOR *GetEvaluator(
-    EvaluatorCacheT<EVALUATOR> *,
-    BufferDescriptor const &,
-    BufferDescriptor const &,
-    BufferDescriptor const &,
-    BufferDescriptor const &,
-    BufferDescriptor const &,
-    BufferDescriptor const &,
-    BufferDescriptor const &,
-    DEVICE_CONTEXT,
-    typename enable_if<!instantiatable<EVALUATOR>::value, void>::type*t=0) {
-    (void)t;
-    return NULL;
-}
-
 template <typename EVALUATOR, typename DEVICE_CONTEXT>
 static EVALUATOR *GetEvaluator(
     EvaluatorCacheT<EVALUATOR> *,
@@ -448,7 +347,9 @@ public:
         assert(_refiner);
 
         MeshInterface<PATCH_TABLE>::refineMesh(
-            *_refiner, level, bits);
+            *_refiner, level,
+            bits.test(MeshAdaptive),
+            bits.test(MeshUseSingleCreasePatch));
 
         int vertexBufferStride = numVertexElements +
             (bits.test(MeshInterleaveVarying) ? numVaryingElements : 0);
@@ -610,23 +511,16 @@ private:
 
         Far::PatchTableFactory::Options poptions(level);
         poptions.generateFVarTables = bits.test(MeshFVarData);
-        poptions.generateFVarLegacyLinearPatches = !bits.test(MeshFVarAdaptive);
-        poptions.generateLegacySharpCornerPatches = !bits.test(MeshUseSmoothCornerPatch);
         poptions.useSingleCreasePatch = bits.test(MeshUseSingleCreasePatch);
-        poptions.useInfSharpPatch = bits.test(MeshUseInfSharpPatch);
 
-        // points on bilinear and gregory basis endcap boundaries can be
-        // shared among adjacent patches to save some stencils.
-        if (bits.test(MeshEndCapBilinearBasis)) {
-            poptions.SetEndCapType(
-                Far::PatchTableFactory::Options::ENDCAP_BILINEAR_BASIS);
-            poptions.shareEndCapPatchPoints = true;
-        } else if (bits.test(MeshEndCapBSplineBasis)) {
+        if (bits.test(MeshEndCapBSplineBasis)) {
             poptions.SetEndCapType(
                 Far::PatchTableFactory::Options::ENDCAP_BSPLINE_BASIS);
         } else if (bits.test(MeshEndCapGregoryBasis)) {
             poptions.SetEndCapType(
                 Far::PatchTableFactory::Options::ENDCAP_GREGORY_BASIS);
+            // points on gregory basis endcap boundary can be shared among
+            // adjacent patches to save some stencils.
             poptions.shareEndCapPatchPoints = true;
         } else if (bits.test(MeshEndCapLegacyGregory)) {
             poptions.SetEndCapType(

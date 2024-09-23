@@ -32,29 +32,22 @@ namespace Far {
 
 
 namespace {
-    template <typename REAL>
     void
     copyStencilData(int numControlVerts,
                     bool includeCoarseVerts,
                     size_t firstOffset,
-                    std::vector<int> const*   offsets,
-                    std::vector<int> *       _offsets,
-                    std::vector<int> const*   sizes,
-                    std::vector<int> *       _sizes,
-                    std::vector<int> const*   sources,
-                    std::vector<int> *       _sources,
-                    std::vector<REAL> const*  weights,
-                    std::vector<REAL> *      _weights,
-                    std::vector<REAL> const*  duWeights=NULL,
-                    std::vector<REAL> *      _duWeights=NULL,
-                    std::vector<REAL> const*  dvWeights=NULL,
-                    std::vector<REAL> *      _dvWeights=NULL,
-                    std::vector<REAL> const*  duuWeights=NULL,
-                    std::vector<REAL> *      _duuWeights=NULL,
-                    std::vector<REAL> const*  duvWeights=NULL,
-                    std::vector<REAL> *      _duvWeights=NULL,
-                    std::vector<REAL> const*  dvvWeights=NULL,
-                    std::vector<REAL> *      _dvvWeights=NULL) {
+                    std::vector<int> const*    offsets,
+                    std::vector<int> *        _offsets,
+                    std::vector<int> const*    sizes,
+                    std::vector<int> *        _sizes,
+                    std::vector<int> const*    sources,
+                    std::vector<int> *        _sources,
+                    std::vector<float> const*  weights,
+                    std::vector<float> *      _weights,
+                    std::vector<float> const*  duWeights=NULL,
+                    std::vector<float> *      _duWeights=NULL,
+                    std::vector<float> const*  dvWeights=NULL,
+                    std::vector<float> *      _dvWeights=NULL) {
         size_t start = includeCoarseVerts ? 0 : firstOffset;
 
         _offsets->resize(offsets->size());
@@ -65,12 +58,6 @@ namespace {
             _duWeights->resize(duWeights->size());
         if (_dvWeights)
             _dvWeights->resize(dvWeights->size());
-        if (_duuWeights)
-            _duuWeights->resize(duuWeights->size());
-        if (_duvWeights)
-            _duvWeights->resize(duvWeights->size());
-        if (_dvvWeights)
-            _dvvWeights->resize(dvvWeights->size());
 
         // The stencils are probably not in order, so we must copy/sort them.
         // Note here that loop index 'i' represents stencil_i for vertex_i.
@@ -82,7 +69,7 @@ namespace {
         for ( size_t i=start; i<offsets->size(); i++ ) {
             // Once we've copied out all the control verts, jump to the offset
             // where the actual stencils begin.
-            if (includeCoarseVerts && (int)i == numControlVerts)
+            if (includeCoarseVerts and (int)i == numControlVerts)
                 i = firstOffset;
 
             // Copy the stencil.
@@ -95,28 +82,15 @@ namespace {
             std::memcpy(&(*_sources)[curOffset],
                         &(*sources)[off], sz*sizeof(int));
             std::memcpy(&(*_weights)[curOffset],
-                        &(*weights)[off], sz*sizeof(REAL));
+                        &(*weights)[off], sz*sizeof(float));
 
-            if (_duWeights && !_duWeights->empty()) {
+            if (_duWeights) {
                 std::memcpy(&(*_duWeights)[curOffset],
-                            &(*duWeights)[off], sz*sizeof(REAL));
+                            &(*duWeights)[off], sz*sizeof(float));
             }
-            if (_dvWeights && !_dvWeights->empty()) {
+            if (_dvWeights) {
                 std::memcpy(&(*_dvWeights)[curOffset],
-                        &(*dvWeights)[off], sz*sizeof(REAL));
-            }
-
-            if (_duuWeights && !_duuWeights->empty()) {
-                std::memcpy(&(*_duuWeights)[curOffset],
-                        &(*duuWeights)[off], sz*sizeof(REAL));
-            }
-            if (_duvWeights && !_duvWeights->empty()) {
-                std::memcpy(&(*_duvWeights)[curOffset],
-                        &(*duvWeights)[off], sz*sizeof(REAL));
-            }
-            if (_dvvWeights && !_dvvWeights->empty()) {
-                std::memcpy(&(*_dvvWeights)[curOffset],
-                        &(*dvvWeights)[off], sz*sizeof(REAL));
+                        &(*dvWeights)[off], sz*sizeof(float));
             }
 
             curOffset += sz;
@@ -128,26 +102,18 @@ namespace {
         _sizes->resize(stencilCount);
         _sources->resize(weightCount);
 
-        if (_duWeights && !_duWeights->empty())
+        if (_duWeights)
             _duWeights->resize(weightCount);
-        if (_dvWeights && !_dvWeights->empty())
+        if (_dvWeights)
             _dvWeights->resize(weightCount);
-
-        if (_duuWeights && !_duuWeights->empty())
-            _duuWeights->resize(weightCount);
-        if (_duvWeights && !_duvWeights->empty())
-            _duvWeights->resize(weightCount);
-        if (_dvvWeights && !_dvvWeights->empty())
-            _dvvWeights->resize(weightCount);
     }
 };
 
-template <typename REAL>
-StencilTableReal<REAL>::StencilTableReal(int numControlVerts,
+StencilTable::StencilTable(int numControlVerts,
                            std::vector<int> const& offsets,
                            std::vector<int> const& sizes,
                            std::vector<int> const& sources,
-                           std::vector<REAL> const& weights,
+                           std::vector<float> const& weights,
                            bool includeCoarseVerts,
                            size_t firstOffset)
     : _numControlVertices(numControlVerts) {
@@ -160,9 +126,8 @@ StencilTableReal<REAL>::StencilTableReal(int numControlVerts,
                     &weights, &_weights);
 }
 
-template <typename REAL>
 void
-StencilTableReal<REAL>::Clear() {
+StencilTable::Clear() {
     _numControlVertices=0;
     _sizes.clear();
     _offsets.clear();
@@ -170,61 +135,34 @@ StencilTableReal<REAL>::Clear() {
     _weights.clear();
 }
 
-template <typename REAL>
-LimitStencilTableReal<REAL>::LimitStencilTableReal(
-                                     int numControlVerts,
+LimitStencilTable::LimitStencilTable(int numControlVerts,
                                      std::vector<int> const& offsets,
                                      std::vector<int> const& sizes,
                                      std::vector<int> const& sources,
-                                     std::vector<REAL> const& weights,
-                                     std::vector<REAL> const& duWeights,
-                                     std::vector<REAL> const& dvWeights,
-                                     std::vector<REAL> const& duuWeights,
-                                     std::vector<REAL> const& duvWeights,
-                                     std::vector<REAL> const& dvvWeights,
+                                     std::vector<float> const& weights,
+                                     std::vector<float> const& duWeights,
+                                     std::vector<float> const& dvWeights,
                                      bool includeCoarseVerts,
                                      size_t firstOffset)
-    : StencilTableReal<REAL>(numControlVerts) {
+    : StencilTable(numControlVerts) {
     copyStencilData(numControlVerts,
                     includeCoarseVerts,
                     firstOffset,
-                    &offsets, &this->_offsets,
-                    &sizes, &this->_sizes,
-                    &sources, &this->_indices,
-                    &weights, &this->_weights,
+                    &offsets, &_offsets,
+                    &sizes, &_sizes,
+                    &sources, &_indices,
+                    &weights, &_weights,
                     &duWeights, &_duWeights,
-                    &dvWeights, &_dvWeights,
-                    &duuWeights, &_duuWeights,
-                    &duvWeights, &_duvWeights,
-                    &dvvWeights, &_dvvWeights);
+                    &dvWeights, &_dvWeights);
 }
 
-template <typename REAL>
 void
-LimitStencilTableReal<REAL>::Clear() {
-    StencilTableReal<REAL>::Clear();
+LimitStencilTable::Clear() {
+    StencilTable::Clear();
     _duWeights.clear();
     _dvWeights.clear();
-    _duuWeights.clear();
-    _duvWeights.clear();
-    _dvvWeights.clear();
 }
 
-
-//
-//  Explicit instantiation for float and double:
-//
-template class StencilReal<float>;
-template class StencilReal<double>;
-
-template class LimitStencilReal<float>;
-template class LimitStencilReal<double>;
-
-template class StencilTableReal<float>;
-template class StencilTableReal<double>;
-
-template class LimitStencilTableReal<float>;
-template class LimitStencilTableReal<double>;
 
 } // end namespace Far
 
@@ -232,3 +170,5 @@ template class LimitStencilTableReal<double>;
 using namespace OPENSUBDIV_VERSION;
 
 } // end namespace OpenSubdiv
+
+

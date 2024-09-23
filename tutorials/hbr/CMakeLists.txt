@@ -37,8 +37,3 @@ foreach(tutorial ${TUTORIALS})
 endforeach()
 
 add_custom_target(hbr_tutorials DEPENDS ${TUTORIAL_TARGETS})
-
-set_target_properties(hbr_tutorials
-    PROPERTIES 
-        FOLDER "tutorials/hbr"
-)

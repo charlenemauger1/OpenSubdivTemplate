@@ -48,10 +48,10 @@ Topology
 
 Well-constructed subdivision meshes have several important properties:
 
-    * They consist primarily of regular faces (quads for Catmull-Clark, tris for Loop)
+    * They consist primarily of quad faces
     * They contain few extraordinary vertices
     * They efficiently describe the intended shape
-    * They are topologically `manifold <subdivision_surfaces.html#non-manifold-topology>`__
+    * They are topologically `manifold <subdivision_surfaces.html#manifold-geometry>`__
 
 ----
 
@@ -196,10 +196,11 @@ An excellent short tutorial from the Guerrilla CG Project that illustrates many
 of the common pitfalls of subdivision modeling, and the strategies to overcome
 them:
 
-.. image::  https://graphics.pixar.com/opensubdiv/videothumbnails/subdiv_topology_guerrillacg.png
-   :align:  center
-   :width:  75%
-   :target: https://www.youtube.com/embed/k_S1INdEmdI
+.. raw:: html
+
+    <center>
+    <iframe width="640" height="360" src="http://www.youtube.com/embed/k_S1INdEmdI" frameborder="0" allowfullscreen></iframe>
+    </center>
 
 ----
 
@@ -207,8 +208,9 @@ Ivo Kos, Modelling Technical Director at Pixar Animation Studios, shows some of
 the modeling techniques he uses when modeling props and architecture sets for
 feature films.
 
-.. image::  https://graphics.pixar.com/opensubdiv/videothumbnails/subdiv_modeling_pixar2013.png
-   :align:  center
-   :width:  75%
-   :target: https://player.vimeo.com/video/70600180
+.. raw:: html
+
+    <center>
+    <iframe src="http://player.vimeo.com/video/70600180" width="640" height="360" frameborder="0" allowfullscreen></iframe>
+    </center>
 

@@ -172,22 +172,6 @@ D3D11ComputeEvaluator::Create(BufferDescriptor const &srcDesc,
                               BufferDescriptor const &duDesc,
                               BufferDescriptor const &dvDesc,
                               ID3D11DeviceContext *deviceContext) {
-    return Create(srcDesc, dstDesc, duDesc, dvDesc,
-                  BufferDescriptor(),
-                  BufferDescriptor(),
-                  BufferDescriptor(),
-                  deviceContext);
-}
-
-D3D11ComputeEvaluator *
-D3D11ComputeEvaluator::Create(BufferDescriptor const &srcDesc,
-                              BufferDescriptor const &dstDesc,
-                              BufferDescriptor const &duDesc,
-                              BufferDescriptor const &dvDesc,
-                              BufferDescriptor const &duuDesc,
-                              BufferDescriptor const &duvDesc,
-                              BufferDescriptor const &dvvDesc,
-                              ID3D11DeviceContext *deviceContext) {
     (void)deviceContext;  // not used
 
     // TODO: implements derivatives
@@ -236,11 +220,11 @@ D3D11ComputeEvaluator::Compile(BufferDescriptor const &srcDesc,
     ss << _workGroupSize;  std::string workgroupSizeValue(ss.str()); ss.str("");
 
     D3D_SHADER_MACRO defines[] =
-        { { "LENGTH", lengthValue.c_str() },
-          { "SRC_STRIDE", srcStrideValue.c_str() },
-          { "DST_STRIDE", dstStrideValue.c_str() },
-          { "WORK_GROUP_SIZE", workgroupSizeValue.c_str() },
-          { 0, 0 } };
+        { "LENGTH", lengthValue.c_str(),
+          "SRC_STRIDE", srcStrideValue.c_str(),
+          "DST_STRIDE", dstStrideValue.c_str(),
+          "WORK_GROUP_SIZE", workgroupSizeValue.c_str(),
+          0, 0 };
 
     ID3DBlob * computeShaderBuffer = NULL;
     ID3DBlob * errorBuffer = NULL;

@@ -27,7 +27,7 @@
 // Tutorial description:
 //
 // This tutorial shows how to safely create Hbr meshes from arbitrary topology.
-// Because Hbr is a half-edge data structure, it cannot represent non-manifold
+// Because Hbr is a half-edge data structure, it cannot represeent non-manifold
 // topology. Ensuring that the geometry used is manifold is a requirement to use
 // Hbr safely. This tutorial presents some simple tests to detect inappropriate
 // topology.
@@ -145,7 +145,7 @@ int main(int, char **) {
             Hhalfedge const * opposite = destination->GetEdge(origin);
 
             // Make sure that the vertices exist in the mesh
-            if (origin==NULL || destination==NULL) {
+            if (origin==NULL or destination==NULL) {
                 printf(" An edge was specified that connected a nonexistent vertex\n");
                 valid=false;
                 break;
@@ -159,7 +159,7 @@ int main(int, char **) {
             }
 
             // Check that no more than 2 faces are adjacent to the edge
-            if (opposite && opposite->GetOpposite() ) {
+            if (opposite and opposite->GetOpposite() ) {
                 printf(" A non-manifold edge incident to more than 2 faces was found\n");
                 valid=false;
                 break;

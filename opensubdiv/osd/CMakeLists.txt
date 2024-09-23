@@ -54,17 +54,6 @@ set(PUBLIC_HEADER_FILES
 
 set(DOXY_HEADER_FILES ${PUBLIC_HEADER_FILES})
 
-# These are public but excluded from doxygen
-list(APPEND PUBLIC_HEADER_FILES
-    patchBasisTypes.h
-    patchBasis.h
-)
-
-list(APPEND KERNEL_FILES
-    patchBasisTypes.h
-    patchBasis.h
-)
-
 #-------------------------------------------------------------------------------
 set(OPENMP_PUBLIC_HEADERS
     ompEvaluator.h
@@ -93,6 +82,8 @@ set(TBB_PUBLIC_HEADERS
 )
 
 if( TBB_FOUND )
+    include_directories("${TBB_INCLUDE_DIR}")
+
     list(APPEND CPU_SOURCE_FILES
         tbbEvaluator.cpp
         tbbKernel.cpp
@@ -105,7 +96,7 @@ if( TBB_FOUND )
     endif()
 
     list(APPEND PLATFORM_CPU_LIBRARIES
-        TBB::tbb
+        ${TBB_LIBRARIES}
     )
 endif()
 
@@ -122,7 +113,7 @@ set(GL_PUBLIC_HEADERS
     glslPatchShaderSource.h
 )
 
-if( (NOT NO_OPENGL) AND (OPENGL_FOUND OR OPENGLES_FOUND) )
+if( OPENGL_FOUND OR OPENGLES_FOUND )
     list(APPEND GPU_SOURCE_FILES
         cpuGLVertexBuffer.cpp
         glLegacyGregoryPatchTable.cpp
@@ -134,13 +125,9 @@ if( (NOT NO_OPENGL) AND (OPENGL_FOUND OR OPENGLES_FOUND) )
     if ( OPENGL_FOUND )
         list(APPEND KERNEL_FILES
             glslPatchCommon.glsl
-            glslPatchCommonTess.glsl
-            glslPatchBoxSplineTriangle.glsl
             glslPatchBSpline.glsl
             glslPatchGregory.glsl
             glslPatchGregoryBasis.glsl
-            glslPatchGregoryTriangle.glsl
-            glslPatchLegacy.glsl
         )
     endif()
 endif()
@@ -163,7 +150,7 @@ if( OPENGL_4_2_FOUND )
         glslXFBKernel.glsl
     )
     list(APPEND PLATFORM_GPU_LIBRARIES
-        ${OPENGL_LOADER_LIBRARIES}
+        ${GLEW_LIBRARY}
     )
 endif()
 
@@ -186,7 +173,7 @@ if( OPENGL_4_3_FOUND )
         glslComputeKernel.glsl
     )
     list(APPEND PLATFORM_GPU_LIBRARIES
-        ${OPENGL_LOADER_LIBRARIES}
+        ${GLEW_LIBRARY}
     )
 endif()
 
@@ -216,13 +203,9 @@ if( DXSDK_FOUND )
     list(APPEND KERNEL_FILES
         hlslComputeKernel.hlsl
         hlslPatchCommon.hlsl
-        hlslPatchCommonTess.hlsl
-        hlslPatchBoxSplineTriangle.hlsl
         hlslPatchBSpline.hlsl
         hlslPatchGregory.hlsl
         hlslPatchGregoryBasis.hlsl
-        hlslPatchGregoryTriangle.hlsl
-        hlslPatchLegacy.hlsl
     )
     list(APPEND PLATFORM_GPU_LIBRARIES
         ${DXSDK_LIBRARIES}
@@ -230,58 +213,6 @@ if( DXSDK_FOUND )
 endif()
 
 list(APPEND DOXY_HEADER_FILES ${DXSDK_PUBLIC_HEADERS})
-
-#-------------------------------------------------------------------------------
-# Metal code & dependencies
-set(METAL_PUBLIC_HEADERS
-    mtlVertexBuffer.h
-    mtlComputeEvaluator.h
-    mtlLegacyGregoryPatchTable.h
-    mtlPatchTable.h
-    mtlMesh.h
-    mtlPatchShaderSource.h
-    mtlCommon.h
-)
-
-
-if( METAL_FOUND )
-    set(METAL_SOURCE_FILES
-        mtlVertexBuffer.mm
-        mtlComputeEvaluator.mm
-        mtlLegacyGregoryPatchTable.mm
-        mtlPatchTable.mm
-        mtlVertexBuffer.mm
-        mtlPatchShaderSource.mm
-    )
-
-    set_source_files_properties(
-        ${METAL_SOURCE_FILES}
-        PROPERTIES
-        COMPILE_FLAGS
-        "-fobjc-arc")
-
-    list(APPEND GPU_SOURCE_FILES ${METAL_SOURCE_FILES})
-
-    
-
-    list(APPEND PUBLIC_HEADER_FILES ${METAL_PUBLIC_HEADERS})
-    list(APPEND KERNEL_FILES
-       mtlComputeKernel.metal
-       mtlPatchCommon.metal
-       mtlPatchCommonTess.metal
-       mtlPatchBoxSplineTriangle.metal
-       mtlPatchBSpline.metal
-       mtlPatchGregory.metal
-       mtlPatchGregoryBasis.metal
-       mtlPatchGregoryTriangle.metal
-       mtlPatchLegacy.metal
-    )
-    list(APPEND PLATFORM_GPU_LIBRARIES
-        ${METAL_LIBRARIES}
-    )
-endif()
-
-list(APPEND DOXY_HEADER_FILES ${METAL_PUBLIC_HEADERS})
 
 #-------------------------------------------------------------------------------
 # OpenCL code & dependencies
@@ -359,13 +290,17 @@ if( CUDA_FOUND )
             cudaD3D11VertexBuffer.h
         )
     endif()
+
+    if (UNIX)
+        list( APPEND CUDA_NVCC_FLAGS -Xcompiler -fPIC --gpu-architecture compute_11 )
+    endif()
 endif()
 
 list(APPEND DOXY_HEADER_FILES ${CUDA_PUBLIC_HEADERS})
 
 #-------------------------------------------------------------------------------
 
-osd_stringify("${KERNEL_FILES}" INC_FILES)
+_stringify("${KERNEL_FILES}" INC_FILES)
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -382,15 +317,6 @@ add_library(osd_cpu_obj
         ${PUBLIC_HEADER_FILES}
 )
 
-set_target_properties(osd_cpu_obj
-    PROPERTIES
-        FOLDER "opensubdiv"
-)
-
-target_link_libraries(osd_cpu_obj
-    ${PLATFORM_CPU_LIBRARIES}
-)
-
 if( GPU_SOURCE_FILES ) 
     add_library(osd_gpu_obj
         OBJECT
@@ -399,13 +325,9 @@ if( GPU_SOURCE_FILES )
             ${PUBLIC_HEADER_FILES}
             ${INC_FILES}
     )
-    set_target_properties(osd_gpu_obj
-        PROPERTIES
-            FOLDER "opensubdiv"
-    )
 endif()
 
-osd_add_doxy_headers( "${DOXY_HEADER_FILES}" )
+_add_doxy_headers( "${DOXY_HEADER_FILES}" )
 
 install(
     FILES
@@ -416,6 +338,7 @@ install(
         OWNER_READ
         GROUP_READ
         WORLD_READ )
+
 
 if (ANDROID)
     install(

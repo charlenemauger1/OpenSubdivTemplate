@@ -25,7 +25,7 @@
 #ifndef STOPWATCH_H
 #define STOPWATCH_H
 
-#if (_WIN32)
+#if (_WIN32 or _WIN64)
     #include <windows.h>
 #else
     #include <sys/types.h>
@@ -37,21 +37,20 @@ class Stopwatch {
 
 public:
 
-#ifndef _WIN32
+#ifndef _WINDOWS
     Stopwatch() : _totalElapsed(0) { }
 
     void Start() {
         struct timeval l_rtime;
         gettimeofday(&l_rtime,0);
-        _elapsed = (double)l_rtime.tv_sec + (double)l_rtime.tv_usec/1000000.0;
+        _elapsed = l_rtime.tv_sec + l_rtime.tv_usec/1000000.0;
     }
 
     void Stop() {
         struct timeval l_rtime;
 
         gettimeofday(&l_rtime,0);
-        _elapsed = ((double)l_rtime.tv_sec + (double)l_rtime.tv_usec/1000000.0)
-                 - _elapsed;
+        _elapsed = (l_rtime.tv_sec + l_rtime.tv_usec/1000000.0) - _elapsed;
         _totalElapsed += _elapsed;
     }
 
@@ -91,7 +90,7 @@ public:
 
 private:
 
-#ifndef _WIN32
+#ifndef _WINDOWS
     double _elapsed;
     double _totalElapsed;
 #else

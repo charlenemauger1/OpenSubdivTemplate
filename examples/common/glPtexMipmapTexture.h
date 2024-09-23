@@ -25,12 +25,12 @@
 #ifndef OPENSUBDIV_EXAMPLES_GL_PTEX_MIPMAP_TEXTURE_H
 #define OPENSUBDIV_EXAMPLES_GL_PTEX_MIPMAP_TEXTURE_H
 
-#include "glLoader.h"
+#include <osd/nonCopyable.h>
+#include <osd/opengl.h>
 
-#include <opensubdiv/osd/nonCopyable.h>
-
-#include <Ptexture.h>
 #include <stdlib.h>
+
+class PtexTexture;
 
 class GLPtexMipmapTexture : OpenSubdiv::Osd::NonCopyable<GLPtexMipmapTexture> {
 public:
@@ -48,7 +48,7 @@ public:
     /// Returns the texels texture array.
     GLuint GetTexelsTexture() const { return _texels; }
 
-    /// Returns the amount of allocated memory (in bytes)
+    /// Returns the amount of allocated memory (in byte)
     size_t GetMemoryUsage() const { return _memoryUsage; }
 
     ~GLPtexMipmapTexture();
@@ -56,7 +56,7 @@ public:
 private:
     GLPtexMipmapTexture();
 
-    GLsizei _width,   // width / height / depth of the 3D texel buffer
+    GLsizei _width,   // widht / height / depth of the 3D texel buffer
             _height,
             _depth;
 

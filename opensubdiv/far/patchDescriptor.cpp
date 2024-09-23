@@ -37,18 +37,13 @@ namespace Far {
 //
 // Lists of valid patch Descriptors for each subdivision scheme
 //
-// Historically this has only included the non-linear patch types, though
-// it is possible for linear patches to represent irregularities for both
-// Catmark and Loop, and the Bilinear scheme is adaptively refined into
-// linear quads (e.g. a pentagon becoming five quads).
-//
 
 ConstPatchDescriptorArray
 PatchDescriptor::GetAdaptivePatchDescriptors(Sdc::SchemeType type) {
 
     static PatchDescriptor _loopDescriptors[] = {
+        // XXXX work in progress !
         PatchDescriptor(LOOP),
-        PatchDescriptor(GREGORY_TRIANGLE),
     };
 
     static PatchDescriptor _catmarkDescriptors[] = {
@@ -77,8 +72,7 @@ void
 PatchDescriptor::print() const {
     static char const * types[13] = {
         "NON_PATCH", "POINTS", "LINES", "QUADS", "TRIANGLES", "LOOP",
-            "REGULAR", "GREGORY", "GREGORY_BOUNDARY", "GREGORY_BASIS",
-            "GREGORY_TRIANGLE"};
+            "REGULAR", "GREGORY", "GREGORY_BOUNDARY", "GREGORY_BASIS" };
 
     printf("    type %s\n",
         types[_type]);

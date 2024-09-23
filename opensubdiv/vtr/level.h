@@ -59,11 +59,11 @@ class FVarLevel;
 //  the topology (i.e. all quads or all tris if not level 0).
 //
 //  This class is intended for private use within the library.  There are still
-//  opportunities to specialize levels -- e.g. those supporting N-sided faces vs
-//  those that are purely quads or tris -- so we prefer to insulate it from public
+//  opportunities to specialize levels -- e.g. those supporing N-sided faces vs
+//  those are are purely quads or tris -- so we prefer to insulate it from public
 //  access.
 //
-//  The representation of topology here is to store six topological relationships
+//  The represenation of topology here is to store six topological relationships
 //  in tables of integers.  Each is stored in its own array(s) so the result is
 //  a SOA representation of the topology.  The six relations are:
 //
@@ -75,7 +75,7 @@ class FVarLevel;
 //      - vert-edges:  edges incident a vertex
 //
 //  There is some redundancy here but the intent is not that this be a minimal
-//  representation, the intent is that it be amenable to refinement.  Classes in
+//  represenation, the intent is that it be amenable to refinement.  Classes in
 //  the Far layer essentially store 5 of these 6 in a permuted form -- we add
 //  the face-edges here to simplify refinement.
 //
@@ -91,7 +91,7 @@ public:
     //
     //  Most of these properties are passed down to child components during
     //  refinement, but some -- notably the designation of a component as semi-
-    //  sharp -- require re-determination as sharpness values are reduced at each
+    //  sharp -- require re-determination as sharpnes values are reduced at each
     //  level.
     //
     struct VTag {
@@ -100,7 +100,7 @@ public:
         //  When cleared, the VTag ALMOST represents a smooth, regular, interior
         //  vertex -- the Type enum requires a bit be explicitly set for Smooth,
         //  so that must be done explicitly if desired on initialization.
-        void clear() { std::memset((void*) this, 0, sizeof(VTag)); }
+        void clear() { std::memset(this, 0, sizeof(VTag)); }
 
         typedef unsigned short VTagSize;
 
@@ -112,36 +112,18 @@ public:
         VTagSize _semiSharp       : 1;  // variable
         VTagSize _semiSharpEdges  : 1;  // variable
         VTagSize _rule            : 4;  // variable when _semiSharp
+        VTagSize _incomplete      : 1;  // variable for sparse refinement
 
-        //  These next to tags are complementary -- the "incomplete" tag is only
-        //  relevant for refined levels while the "incident an irregular face" tag
-        //  is only relevant for the base level.  They could be combined as both
-        //  indicate "no full regular ring" around a vertex
-        VTagSize _incomplete      : 1;  // variable only set in refined levels
-        VTagSize _incidIrregFace  : 1;  // variable only set in base level
-
-        //  Tags indicating incident infinitely-sharp (permanent) features
-        VTagSize _infSharpEdges   : 1;  // fixed
-        VTagSize _infSharpCrease  : 1;  // fixed
-        VTagSize _infIrregular    : 1;  // fixed
-
-        //  Alternate constructor and accessor for dealing with integer bits directly:
-        explicit VTag(VTagSize bits) {
-            std::memcpy(this, &bits, sizeof(bits));
-        }
-        VTagSize getBits() const {
-            VTagSize bits;
-            std::memcpy(&bits, this, sizeof(bits));
-            return bits;
-        }
-
-        static VTag BitwiseOr(VTag const vTags[], int size = 4);
+        //  On deck -- coming soon...
+        //VTagSize _constSharp   : 1;  // variable when _semiSharp
+        //VTagSize _hasEdits     : 1;  // variable
+        //VTagSize _editsApplied : 1;  // variable
     };
     struct ETag {
         ETag() { }
 
         //  When cleared, the ETag represents a smooth, manifold, interior edge
-        void clear() { std::memset((void*) this, 0, sizeof(ETag)); }
+        void clear() { std::memset(this, 0, sizeof(ETag)); }
 
         typedef unsigned char ETagSize;
 
@@ -149,23 +131,11 @@ public:
         ETagSize _boundary     : 1;  // fixed
         ETagSize _infSharp     : 1;  // fixed
         ETagSize _semiSharp    : 1;  // variable
-
-        //  Alternate constructor and accessor for dealing with integer bits directly:
-        explicit ETag(ETagSize bits) {
-            std::memcpy(this, &bits, sizeof(bits));
-        }
-        ETagSize getBits() const {
-            ETagSize bits;
-            std::memcpy(&bits, this, sizeof(bits));
-            return bits;
-        }
-
-        static ETag BitwiseOr(ETag const eTags[], int size = 4);
     };
     struct FTag {
         FTag() { }
 
-        void clear() { std::memset((void*) this, 0, sizeof(FTag)); }
+        void clear() { std::memset(this, 0, sizeof(FTag)); }
 
         typedef unsigned char FTagSize;
 
@@ -175,34 +145,9 @@ public:
         //FTagSize _hasEdits : 1;  // variable
     };
 
-    //  Additional simple struct to identify a "span" around a vertex, i.e. a
-    //  subset of the faces around a vertex delimited by some property (e.g. a
-    //  face-varying discontinuity, an inf-sharp edge, etc.)
-    //
-    //  The span requires an "origin" and a "size" to fully define its extent.
-    //  Use of the size is required over a leading/trailing pair as the valence
-    //  around a non-manifold vertex cannot be trivially determined from two
-    //  extremeties.  Similarly a start face is chosen over an edge as starting
-    //  with a manifold edge is ambiguous.  Additional tags also support
-    //  non-manifold cases, e.g. periodic spans at the apex of a double cone.
-    //
-    //  Currently setting the size to 0 or leaving the span "unassigned" is an
-    //  indication to use the full neighborhood rather than a subset -- prefer
-    //  use of the const method here to direct inspection of the member.
-    //
-    struct VSpan {
-        VSpan() { std::memset((void*) this, 0, sizeof(VSpan)); }
+    VTag getFaceCompositeVTag(ConstIndexArray & faceVerts) const;
 
-        void clear()            { std::memset((void*) this, 0, sizeof(VSpan)); }
-        bool isAssigned() const { return _numFaces > 0; }
-
-        LocalIndex _numFaces;
-        LocalIndex _startFace;
-        LocalIndex _cornerInSpan;
-
-        unsigned short _periodic : 1;
-        unsigned short _sharp    : 1;
-    };
+    ETag getFaceCompositeETag(ConstIndexArray & faceEdges) const;
 
 public:
     Level();
@@ -234,7 +179,7 @@ public:
     //  Once have only quads (or tris), this local index need only occupy two bits
     //  and could conceivably be packed into the same integer as the face index, but
     //  for now, given the need to support faces of potentially high valence we'll
-    //  use an 8- or 16-bit integer.
+    //  us an 8- or 16-bit integer.
     //
     //  Methods to access the six topological relations:
     ConstIndexArray getFaceVertices(Index faceIndex) const;
@@ -324,29 +269,6 @@ public:
     bool isSingleCreasePatch(Index face, float* sharpnessOut=NULL, int* rotationOut=NULL) const;
 
     //
-    //  When inspecting topology, the component tags -- particularly VTag and ETag -- are most
-    //  often inspected in groups for the face to which they belong.  They are designed to be
-    //  bitwise OR'd (the result then referred to as a "composite" tag) to make quick decisions
-    //  about the face as a whole to avoid tedious topological inspection.
-    //
-    //  The same logic can be applied to topology in a FVar channel when tags specific to that
-    //  channel are used.  Note that the VTags apply to the FVar values assigned to the corners
-    //  of the face and not the vertex as a whole.  The "composite" face-varying VTag for a
-    //  vertex is the union of VTags of all distinct FVar values for that vertex.
-    //
-    bool doesVertexFVarTopologyMatch(Index vIndex, int fvarChannel) const;
-    bool doesFaceFVarTopologyMatch(  Index fIndex, int fvarChannel) const;
-    bool doesEdgeFVarTopologyMatch(  Index eIndex, int fvarChannel) const;
-
-    void getFaceVTags(Index fIndex, VTag vTags[], int fvarChannel = -1) const;
-    void getFaceETags(Index fIndex, ETag eTags[], int fvarChannel = -1) const;
-
-    VTag getFaceCompositeVTag(Index fIndex, int fvarChannel = -1) const;
-    VTag getFaceCompositeVTag(ConstIndexArray & fVerts) const;
-
-    VTag getVertexCompositeFVarVTag(Index vIndex, int fvarChannel) const;
-
-    //
     //  When gathering "patch points" we may want the indices of the vertices or the corresponding
     //  FVar values for a particular channel.  Both are represented and equally accessible within
     //  the faces, so we allow all to be returned through these methods.  Setting the optional FVar
@@ -362,10 +284,7 @@ public:
     int gatherQuadRegularCornerPatchPoints(  Index fIndex, Index patchPoints[], int cornerVertInFace,
                                                                                 int fvarChannel = -1) const;
 
-    int gatherQuadRegularRingAroundVertex(Index vIndex, Index ringPoints[],
-                                          int fvarChannel = -1) const;
-    int gatherQuadRegularPartialRingAroundVertex(Index vIndex, VSpan const & span, Index ringPoints[],
-                                                 int fvarChannel = -1) const;
+    int gatherQuadRegularRingAroundVertex(Index vIndex, Index ringPoints[], int fvarChannel = -1) const;
 
     //  WIP -- for future use, need to extend for face-varying...
     int gatherTriRegularInteriorPatchPoints(      Index fIndex, Index patchVerts[], int rotation = 0) const;
@@ -495,7 +414,7 @@ private:
 
     //  The "depth" member is clearly useful in both the topological splitting and the
     //  stencil queries, but arguably it ties the Level to a hierarchy which counters
-    //  the idea of it being independent.
+    //  the idea if it being independent.
     int _depth;
 
     //  Maxima to help clients manage sizing of data buffers.  Given "max valence",
@@ -554,7 +473,7 @@ private:
 };
 
 //
-//  Access/modify the vertices incident a given face:
+//  Access/modify the vertices indicent a given face:
 //
 inline ConstIndexArray
 Level::getFaceVertices(Index faceIndex) const {
@@ -584,7 +503,7 @@ Level::getFaceVertices() const {
 }
 
 //
-//  Access/modify the edges incident a given face:
+//  Access/modify the edges indicent a given face:
 //
 inline ConstIndexArray
 Level::getFaceEdges(Index faceIndex) const {
@@ -598,7 +517,7 @@ Level::getFaceEdges(Index faceIndex) {
 }
 
 //
-//  Access/modify the faces incident a given vertex:
+//  Access/modify the faces indicent a given vertex:
 //
 inline ConstIndexArray
 Level::getVertexFaces(Index vertIndex) const {
@@ -635,7 +554,7 @@ Level::trimVertexFaces(Index vertIndex, int count) {
 }
 
 //
-//  Access/modify the edges incident a given vertex:
+//  Access/modify the edges indicent a given vertex:
 //
 inline ConstIndexArray
 Level::getVertexEdges(Index vertIndex) const {
@@ -679,7 +598,7 @@ Level::setMaxValence(int valence) {
 }
 
 //
-//  Access/modify the vertices incident a given edge:
+//  Access/modify the vertices indicent a given edge:
 //
 inline ConstIndexArray
 Level::getEdgeVertices(Index edgeIndex) const {
@@ -691,7 +610,7 @@ Level::getEdgeVertices(Index edgeIndex) {
 }
 
 //
-//  Access/modify the faces incident a given edge:
+//  Access/modify the faces indicent a given edge:
 //
 inline ConstIndexArray
 Level::getEdgeFaces(Index edgeIndex) const {
@@ -801,7 +720,7 @@ Level::resizeFaces(int faceCount) {
     _faceVertCountsAndOffsets.resize(2 * faceCount);
 
     _faceTags.resize(faceCount);
-    std::memset((void*) &_faceTags[0], 0, _faceCount * sizeof(FTag));
+    std::memset(&_faceTags[0], 0, _faceCount * sizeof(FTag));
 }
 inline void
 Level::resizeFaceVertices(int totalFaceVertCount) {
@@ -822,7 +741,7 @@ Level::resizeEdges(int edgeCount) {
     _edgeTags.resize(edgeCount);
 
     if (edgeCount>0) {
-        std::memset((void*) &_edgeTags[0], 0, _edgeCount * sizeof(ETag));
+        std::memset(&_edgeTags[0], 0, _edgeCount * sizeof(ETag));
     }
 }
 inline void
@@ -846,7 +765,7 @@ Level::resizeVertices(int vertCount) {
 
     _vertSharpness.resize(vertCount);
     _vertTags.resize(vertCount);
-    std::memset((void*) &_vertTags[0], 0, _vertCount * sizeof(VTag));
+    std::memset(&_vertTags[0], 0, _vertCount * sizeof(VTag));
 }
 inline void
 Level::resizeVertexFaces(int totalVertFaceCount) {

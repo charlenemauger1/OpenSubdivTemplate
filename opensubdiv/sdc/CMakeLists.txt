@@ -53,16 +53,10 @@ if (NOT NO_LIB)
             ${PRIVATE_HEADER_FILES}
             ${PUBLIC_HEADER_FILES}
     )
-
-    set_target_properties(sdc_obj
-        PROPERTIES
-            FOLDER "opensubdiv"
-    )
-
 endif()
 
 #-------------------------------------------------------------------------------
-osd_add_doxy_headers( "${DOXY_HEADER_FILES}" )
+_add_doxy_headers( "${DOXY_HEADER_FILES}" )
 
 install(
     FILES

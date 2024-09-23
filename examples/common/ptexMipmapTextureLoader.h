@@ -25,11 +25,11 @@
 #ifndef OPENSUBDIV_EXAMPLES_PTEX_MIPMAP_TEXTURE_LOADER_H
 #define OPENSUBDIV_EXAMPLES_PTEX_MIPMAP_TEXTURE_LOADER_H
 
-#include <Ptexture.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <vector>
 
+class PtexTexture;
 
 class PtexMipmapTextureLoader {
 public:
@@ -37,8 +37,7 @@ public:
                                int maxNumPages,
                                int maxLevels = -1,
                                size_t targetMemory = 0,
-                               bool seamlessMipmap = true,
-                               bool padAlpha = false);
+                               bool seamlessMipmap = true);
 
     ~PtexMipmapTextureLoader();
 
@@ -119,8 +118,8 @@ private:
                        unsigned char *pptr, int bpp, int stride);
 
         static bool sort(const Block *a, const Block *b) {
-            return (a->height > b->height) ||
-                   ((a->height == b->height) && (a->width > b->width));
+            return (a->height > b->height) or
+                   ((a->height == b->height) and (a->width > b->width));
         }
     };
 
@@ -137,7 +136,6 @@ private:
     int  resampleBorder(int face, int edgeId, unsigned char *result,
                         int dstLength, int bpp,
                         float srcStart = 0.0f, float srcEnd = 1.0f);
-    void addAlphaChannel();
 
     std::vector<Block> _blocks;
     std::vector<Page *> _pages;

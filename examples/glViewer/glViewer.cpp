@@ -22,86 +22,103 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
+#include "../common/glUtils.h"
 
 #include <GLFW/glfw3.h>
 GLFWwindow* g_window=0;
 GLFWmonitor* g_primary=0;
 
-#include <opensubdiv/far/error.h>
+#include <far/error.h>
 
-#include <opensubdiv/osd/cpuEvaluator.h>
-#include <opensubdiv/osd/cpuGLVertexBuffer.h>
+#include <osd/cpuEvaluator.h>
+#include <osd/cpuGLVertexBuffer.h>
 
 #ifdef OPENSUBDIV_HAS_OPENMP
-    #include <opensubdiv/osd/ompEvaluator.h>
+    #include <osd/ompEvaluator.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_TBB
-    #include <opensubdiv/osd/tbbEvaluator.h>
+    #include <osd/tbbEvaluator.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_OPENCL
-    #include <opensubdiv/osd/clGLVertexBuffer.h>
-    #include <opensubdiv/osd/clEvaluator.h>
+    #include <osd/clGLVertexBuffer.h>
+    #include <osd/clEvaluator.h>
     #include "../common/clDeviceContext.h"
 
     CLDeviceContext g_clDeviceContext;
 #endif
 
 #ifdef OPENSUBDIV_HAS_CUDA
-    #include <opensubdiv/osd/cudaGLVertexBuffer.h>
-    #include <opensubdiv/osd/cudaEvaluator.h>
+    #include <osd/cudaGLVertexBuffer.h>
+    #include <osd/cudaEvaluator.h>
     #include "../common/cudaDeviceContext.h"
 
     CudaDeviceContext g_cudaDeviceContext;
 #endif
 
 #ifdef OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK
-    #include <opensubdiv/osd/glXFBEvaluator.h>
-    #include <opensubdiv/osd/glVertexBuffer.h>
+    #include <osd/glXFBEvaluator.h>
+    #include <osd/glVertexBuffer.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_GLSL_COMPUTE
-    #include <opensubdiv/osd/glComputeEvaluator.h>
-    #include <opensubdiv/osd/glVertexBuffer.h>
+    #include <osd/glComputeEvaluator.h>
+    #include <osd/glVertexBuffer.h>
 #endif
 
-#include <opensubdiv/osd/glMesh.h>
-#include <opensubdiv/osd/glLegacyGregoryPatchTable.h>
+#include <osd/glMesh.h>
+#include <osd/glLegacyGregoryPatchTable.h>
 OpenSubdiv::Osd::GLMeshInterface *g_mesh = NULL;
 OpenSubdiv::Osd::GLLegacyGregoryPatchTable *g_legacyGregoryPatchTable = NULL;
-bool g_legacyGregoryEnabled = false;
 
 #include "../../regression/common/far_utils.h"
-#include "../../regression/common/arg_utils.h"
 #include "../common/glHud.h"
 #include "../common/glUtils.h"
 #include "../common/glControlMeshDisplay.h"
 #include "../common/glShaderCache.h"
-#include "../common/glUtils.h"
 #include "../common/objAnim.h"
 #include "../common/simple_math.h"
 #include "../common/stopwatch.h"
-#include "../common/viewerArgsUtils.h"
-#include <opensubdiv/osd/glslPatchShaderSource.h>
+#include <osd/glslPatchShaderSource.h>
 
+
+
+/* Function to get the correct shader file based on the opengl version.
+  The implentation varies depending if glew is available or not. In case
+  is available the capabilities are queried during execution and the correct
+  source is returned. If glew in not available during compile time the version
+  is determined*/
 static const char *shaderSource(){
-    static const char *res = NULL;
-    if (!res) {
-        static const char *gen =
+#if not defined(OSD_USES_GLEW)
+
+static const char *res =
+#if defined(GL_ARB_tessellation_shader) || defined(GL_VERSION_4_0)
 #include "shader.gen.h"
-            ;
-        static const char *gen3 =
+#else
 #include "shader_gl3.gen.h"
-            ;
-        if (GLUtils::SupportsAdaptiveTessellation()) {
-            res = gen;
-        } else {
-            res = gen3;
+#endif
+;
+#else
+        static const char *res = NULL;
+        if (!res){
+            static const char *gen =
+#include "shader.gen.h"
+                ;
+            static const char *gen3 =
+#include "shader_gl3.gen.h"
+                ;
+            //Determine the shader file to use. Since some opengl implementations
+            //define that an extension is available but not an implementation 
+            //for it you cannnot trust in the glew header definitions to know that is 
+            //available, but you need to query it during runtime.
+            if (GLUtils::SupportsAdaptiveTessellation())
+                res = gen;
+            else
+                res = gen3;
         }
-    }
-    return res;
+#endif
+        return res;
 }
 
 #include <cfloat>
@@ -127,11 +144,10 @@ enum ShadingMode { kShadingMaterial,
                    kShadingInterleavedVaryingColor,
                    kShadingFaceVaryingColor,
                    kShadingPatchType,
-                   kShadingPatchDepth,
                    kShadingPatchCoord,
                    kShadingNormal };
 
-enum EndCap      { kEndCapBilinearBasis = 0,
+enum EndCap      { kEndCapNone = 0,
                    kEndCapBSplineBasis,
                    kEndCapGregoryBasis,
                    kEndCapLegacyGregory };
@@ -146,42 +162,39 @@ enum HudCheckBox { kHUD_CB_DISPLAY_CONTROL_MESH_EDGES,
                    kHUD_CB_FREEZE,
                    kHUD_CB_DISPLAY_PATCH_COUNTS,
                    kHUD_CB_ADAPTIVE,
-                   kHUD_CB_SMOOTH_CORNER_PATCH,
-                   kHUD_CB_SINGLE_CREASE_PATCH,
-                   kHUD_CB_INF_SHARP_PATCH };
+                   kHUD_CB_SINGLE_CREASE_PATCH };
 
 int g_currentShape = 0;
 
 ObjAnim const * g_objAnim = 0;
+
+bool g_axis=true;
 
 int   g_frame = 0,
       g_repeatCount = 0;
 float g_animTime = 0;
 
 // GUI variables
-int   g_freeze = 0,
+int   g_fullscreen = 0,
+      g_freeze = 0,
       g_shadingMode = kShadingPatchType,
       g_displayStyle = kDisplayStyleWireOnShaded,
       g_adaptive = 1,
-      g_endCap = kEndCapGregoryBasis,
-      g_smoothCornerPatch = 1,
+      g_endCap = kEndCapBSplineBasis,
       g_singleCreasePatch = 1,
-      g_infSharpPatch = 1,
       g_mbutton[3] = {0, 0, 0},
       g_running = 1;
 
-int   g_screenSpaceTess = 0,
-      g_fractionalSpacing = 0,
+int   g_screenSpaceTess = 1,
+      g_fractionalSpacing = 1,
       g_patchCull = 0,
-      g_displayPatchCounts = 0;
+      g_displayPatchCounts = 1;
 
 float g_rotate[2] = {0, 0},
       g_dolly = 5,
       g_pan[2] = {0, 0},
       g_center[3] = {0, 0, 0},
       g_size = 0;
-
-bool  g_yup = false;
 
 int   g_prev_x = 0,
       g_prev_y = 0;
@@ -213,9 +226,7 @@ GLuint g_transformUB = 0,
        g_tessellationUB = 0,
        g_tessellationBinding = 1,
        g_lightingUB = 0,
-       g_lightingBinding = 2,
-       g_fvarArrayDataUB = 0,
-       g_fvarArrayDataBinding = 3;
+       g_lightingBinding = 2;
 
 struct Transform {
     float ModelViewMatrix[16];
@@ -233,7 +244,7 @@ GLuint g_vao = 0;
 struct FVarData
 {
     FVarData() :
-        textureBuffer(0), textureParamBuffer(0) {
+        textureBuffer(0) {
     }
     ~FVarData() {
         Release();
@@ -242,17 +253,11 @@ struct FVarData
         if (textureBuffer)
             glDeleteTextures(1, &textureBuffer);
         textureBuffer = 0;
-        if (textureParamBuffer)
-            glDeleteTextures(1, &textureParamBuffer);
-        textureParamBuffer = 0;
     }
     void Create(OpenSubdiv::Far::PatchTable const *patchTable,
                 int fvarWidth, std::vector<float> const & fvarSrcData) {
-
-        using namespace OpenSubdiv;
-
         Release();
-        Far::ConstIndexArray indices = patchTable->GetFVarValues();
+        OpenSubdiv::Far::ConstIndexArray indices = patchTable->GetFVarValues();
 
         // expand fvardata to per-patch array
         std::vector<float> data;
@@ -277,22 +282,8 @@ struct FVarData
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         glDeleteBuffers(1, &buffer);
-
-        Far::ConstPatchParamArray fvarParam = patchTable->GetFVarPatchParams();
-        glGenBuffers(1, &buffer);
-        glBindBuffer(GL_ARRAY_BUFFER, buffer);
-        glBufferData(GL_ARRAY_BUFFER, fvarParam.size()*sizeof(Far::PatchParam),
-                     &fvarParam[0], GL_STATIC_DRAW);
-
-        glGenTextures(1, &textureParamBuffer);
-        glBindTexture(GL_TEXTURE_BUFFER, textureParamBuffer);
-        glTexBuffer(GL_TEXTURE_BUFFER, GL_RG32I, buffer);
-        glBindTexture(GL_TEXTURE_BUFFER, 0);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        glDeleteBuffers(1, &buffer);
     }
-    GLuint textureBuffer, textureParamBuffer;
+    GLuint textureBuffer;
 } g_fvarData;
 
 //------------------------------------------------------------------------------
@@ -308,7 +299,7 @@ updateGeom() {
     int nverts = 0;
     int stride = (g_shadingMode == kShadingInterleavedVaryingColor ? 7 : 3);
 
-    if (g_objAnim && g_currentShape==0) {
+    if (g_objAnim and g_currentShape==0) {
 
         nverts = g_objAnim->GetShape()->GetNumVertices(),
 
@@ -320,7 +311,7 @@ updateGeom() {
 
         g_objAnim->InterpolatePositions(g_animTime, &vertex[0], stride);
 
-        if (g_shadingMode == kShadingVaryingColor ||
+        if (g_shadingMode == kShadingVaryingColor or
             g_shadingMode == kShadingInterleavedVaryingColor) {
 
             const float *p = &g_objAnim->GetShape()->verts[0];
@@ -399,7 +390,7 @@ updateGeom() {
 static const char *
 getKernelName(int kernel) {
 
-    if (kernel == kCPU)
+         if (kernel == kCPU)
         return "CPU";
     else if (kernel == kOPENMP)
         return "OpenMP";
@@ -424,13 +415,15 @@ rebuildMesh() {
     ShapeDesc const &shapeDesc = g_defaultShapes[g_currentShape];
     int level = g_level;
     int kernel = g_kernel;
-    bool doAnim = g_objAnim && g_currentShape==0;
+    bool doAnim = g_objAnim and g_currentShape==0;
+    Scheme scheme = shapeDesc.scheme;
 
     Shape const * shape = 0;
     if (doAnim) {
         shape = g_objAnim->GetShape();
     } else {
-        shape = Shape::parseObj(shapeDesc);
+        shape = Shape::parseObj(shapeDesc.data.c_str(), shapeDesc.scheme,
+                                shapeDesc.isLeftHanded);
     }
 
     // create Far mesh (topology)
@@ -449,21 +442,23 @@ rebuildMesh() {
     delete g_mesh;
     g_mesh = NULL;
 
+    // Adaptive refinement currently supported only for catmull-clark scheme
+    bool doAdaptive = (g_adaptive!=0 and scheme==kCatmark);
+    bool interleaveVarying = g_shadingMode == kShadingInterleavedVaryingColor;
+    bool doSingleCreasePatch = (g_singleCreasePatch!=0 and scheme==kCatmark);
+
     Osd::MeshBitset bits;
-    bits.set(Osd::MeshAdaptive,             g_adaptive != 0);
-    bits.set(Osd::MeshUseSmoothCornerPatch, g_smoothCornerPatch != 0);
-    bits.set(Osd::MeshUseSingleCreasePatch, g_singleCreasePatch != 0);
-    bits.set(Osd::MeshUseInfSharpPatch,     g_infSharpPatch != 0);
-    bits.set(Osd::MeshInterleaveVarying,    g_shadingMode == kShadingInterleavedVaryingColor);
-    bits.set(Osd::MeshFVarData,             g_shadingMode == kShadingFaceVaryingColor);
-    bits.set(Osd::MeshEndCapBilinearBasis,  g_endCap == kEndCapBilinearBasis);
-    bits.set(Osd::MeshEndCapBSplineBasis,   g_endCap == kEndCapBSplineBasis);
-    bits.set(Osd::MeshEndCapGregoryBasis,   g_endCap == kEndCapGregoryBasis);
-    bits.set(Osd::MeshEndCapLegacyGregory,  g_endCap == kEndCapLegacyGregory);
+    bits.set(Osd::MeshAdaptive, doAdaptive);
+    bits.set(Osd::MeshUseSingleCreasePatch, doSingleCreasePatch);
+    bits.set(Osd::MeshInterleaveVarying, interleaveVarying);
+    bits.set(Osd::MeshFVarData, g_shadingMode == kShadingFaceVaryingColor);
+    bits.set(Osd::MeshEndCapBSplineBasis, g_endCap == kEndCapBSplineBasis);
+    bits.set(Osd::MeshEndCapGregoryBasis, g_endCap == kEndCapGregoryBasis);
+    bits.set(Osd::MeshEndCapLegacyGregory, g_endCap == kEndCapLegacyGregory);
 
     int numVertexElements = 3;
     int numVaryingElements =
-        (g_shadingMode == kShadingVaryingColor || bits.test(Osd::MeshInterleaveVarying)) ? 4 : 0;
+        (g_shadingMode == kShadingVaryingColor or interleaveVarying) ? 4 : 0;
 
 
     if (kernel == kCPU) {
@@ -556,7 +551,7 @@ rebuildMesh() {
         printf("Unsupported kernel %s\n", getKernelName(kernel));
     }
 
-    if (g_shadingMode == kShadingFaceVaryingColor && shape->HasUV()) {
+    if (g_shadingMode == kShadingFaceVaryingColor and shape->HasUV()) {
 
         std::vector<float> fvarData;
 
@@ -575,7 +570,7 @@ rebuildMesh() {
             Osd::GLLegacyGregoryPatchTable::Create(g_mesh->GetFarPatchTable());
     }
 
-    if (! doAnim) {
+    if (not doAnim) {
         delete shape;
     }
 
@@ -729,8 +724,7 @@ public:
         if (effectDesc.effect.patchCull) {
             ss << "#define OSD_ENABLE_PATCH_CULL\n";
         }
-        if (effectDesc.effect.singleCreasePatch &&
-            type == Far::PatchDescriptor::REGULAR) {
+        if (effectDesc.effect.singleCreasePatch) {
             ss << "#define OSD_PATCH_ENABLE_SINGLE_CREASE\n";
         }
         // for legacy gregory
@@ -764,15 +758,12 @@ public:
         case kShadingFaceVaryingColor:
             ss << "#define OSD_FVAR_WIDTH 2\n";
             ss << "#define SHADING_FACEVARYING_COLOR\n";
-            if (! effectDesc.desc.IsAdaptive()) {
+            if (not effectDesc.desc.IsAdaptive()) {
                 ss << "#define SHADING_FACEVARYING_UNIFORM_SUBDIVISION\n";
             }
             break;
         case kShadingPatchType:
             ss << "#define SHADING_PATCH_TYPE\n";
-            break;
-        case kShadingPatchDepth:
-            ss << "#define SHADING_PATCH_DEPTH\n";
             break;
         case kShadingPatchCoord:
             ss << "#define SHADING_PATCH_COORD\n";
@@ -782,8 +773,10 @@ public:
             break;
         }
 
-        if (type != Far::PatchDescriptor::TRIANGLES &&
-            type != Far::PatchDescriptor::QUADS) {
+        if (type == Far::PatchDescriptor::TRIANGLES) {
+            ss << "#define LOOP\n";
+        } else if (type == Far::PatchDescriptor::QUADS) {
+        } else {
             ss << "#define SMOOTH_NORMALS\n";
         }
 
@@ -794,15 +787,9 @@ public:
             ss << "#define OSD_PATCH_GREGORY_BOUNDARY\n";
         } else if (type == Far::PatchDescriptor::GREGORY_BASIS) {
             ss << "#define OSD_PATCH_GREGORY_BASIS\n";
-        } else if (type == Far::PatchDescriptor::LOOP) {
-            ss << "#define OSD_PATCH_LOOP\n";
-        } else if (type == Far::PatchDescriptor::GREGORY_TRIANGLE) {
-            ss << "#define OSD_PATCH_GREGORY_TRIANGLE\n";
         }
 
         // include osd PatchCommon
-        ss << "#define OSD_PATCH_BASIS_GLSL\n";
-        ss << Osd::GLSLPatchShaderSource::GetPatchBasisShaderSource();
         ss << Osd::GLSLPatchShaderSource::GetCommonShaderSource();
         std::string common = ss.str();
         ss.str("");
@@ -866,10 +853,6 @@ public:
         if (uboIndex != GL_INVALID_INDEX)
             glUniformBlockBinding(program, uboIndex, g_lightingBinding);
 
-        uboIndex = glGetUniformBlockIndex(program, "OsdFVarArrayData");
-        if (uboIndex != GL_INVALID_INDEX)
-            glUniformBlockBinding(program, uboIndex, g_fvarArrayDataBinding);
-
         // assign texture locations
         GLint loc;
         glUseProgram(program);
@@ -879,18 +862,15 @@ public:
         if ((loc = glGetUniformLocation(program, "OsdFVarDataBuffer")) != -1) {
             glUniform1i(loc, 1); // GL_TEXTURE1
         }
-        if ((loc = glGetUniformLocation(program, "OsdFVarParamBuffer")) != -1) {
-            glUniform1i(loc, 2); // GL_TEXTURE2
-        }
         // for legacy gregory patches
         if ((loc = glGetUniformLocation(program, "OsdVertexBuffer")) != -1) {
-            glUniform1i(loc, 3); // GL_TEXTURE3
+            glUniform1i(loc, 2); // GL_TEXTURE2
         }
         if ((loc = glGetUniformLocation(program, "OsdValenceBuffer")) != -1) {
-            glUniform1i(loc, 4); // GL_TEXTURE4
+            glUniform1i(loc, 3); // GL_TEXTURE3
         }
         if ((loc = glGetUniformLocation(program, "OsdQuadOffsetBuffer")) != -1) {
-            glUniform1i(loc, 5); // GL_TEXTURE5
+            glUniform1i(loc, 4); // GL_TEXTURE4
         }
         glUseProgram(0);
 
@@ -903,9 +883,6 @@ ShaderCache g_shaderCache;
 //------------------------------------------------------------------------------
 static void
 updateUniformBlocks() {
-
-    using namespace OpenSubdiv;
-
     if (! g_transformUB) {
         glGenBuffers(1, &g_transformUB);
         glBindBuffer(GL_UNIFORM_BUFFER, g_transformUB);
@@ -938,29 +915,6 @@ updateUniformBlocks() {
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
     glBindBufferBase(GL_UNIFORM_BUFFER, g_tessellationBinding, g_tessellationUB);
-
-    // Update and bind fvar patch array state
-    if (g_mesh->GetPatchTable()->GetNumFVarChannels() > 0) {
-        Osd::PatchArrayVector const &fvarPatchArrays =
-            g_mesh->GetPatchTable()->GetFVarPatchArrays();
-
-        // bind patch arrays UBO (std140 struct size padded to vec4 alignment)
-        int patchArraySize =
-            sizeof(GLint) * ((sizeof(Osd::PatchArray)/sizeof(GLint) + 3) & ~3);
-        if (!g_fvarArrayDataUB) {
-            glGenBuffers(1, &g_fvarArrayDataUB);
-        }
-        glBindBuffer(GL_UNIFORM_BUFFER, g_fvarArrayDataUB);
-        glBufferData(GL_UNIFORM_BUFFER,
-            fvarPatchArrays.size()*patchArraySize, NULL, GL_STATIC_DRAW);
-        for (int i=0; i<(int)fvarPatchArrays.size(); ++i) {
-            glBufferSubData(GL_UNIFORM_BUFFER,
-                i*patchArraySize, sizeof(Osd::PatchArray), &fvarPatchArrays[i]);
-        }
-
-        glBindBufferBase(GL_UNIFORM_BUFFER,
-                g_fvarArrayDataBinding, g_fvarArrayDataUB);
-    }
 
     // Update and bind lighting state
     struct Lighting {
@@ -1008,20 +962,17 @@ bindTextures() {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_BUFFER,
                       g_fvarData.textureBuffer);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_BUFFER,
-                      g_fvarData.textureParamBuffer);
     }
 
     // legacy gregory
     if (g_legacyGregoryPatchTable) {
-        glActiveTexture(GL_TEXTURE3);
+        glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_BUFFER,
                       g_legacyGregoryPatchTable->GetVertexTextureBuffer());
-        glActiveTexture(GL_TEXTURE4);
+        glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_BUFFER,
                       g_legacyGregoryPatchTable->GetVertexValenceTextureBuffer());
-        glActiveTexture(GL_TEXTURE5);
+        glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_BUFFER,
                       g_legacyGregoryPatchTable->GetQuadOffsetsTextureBuffer());
     }
@@ -1036,7 +987,7 @@ bindProgram(Effect effect,
     // only legacy gregory needs maxValence and numElements
     // neither legacy gregory nor gregory basis need single crease
     typedef OpenSubdiv::Far::PatchDescriptor Descriptor;
-    if (patch.GetDescriptor().GetType() == Descriptor::GREGORY ||
+    if (patch.GetDescriptor().GetType() == Descriptor::GREGORY or
         patch.GetDescriptor().GetType() == Descriptor::GREGORY_BOUNDARY) {
         int maxValence = g_mesh->GetMaxValence();
         int numElements = (g_shadingMode == kShadingInterleavedVaryingColor ? 7 : 3);
@@ -1116,9 +1067,7 @@ display() {
     translate(g_transformData.ModelViewMatrix, -g_pan[0], -g_pan[1], -g_dolly);
     rotate(g_transformData.ModelViewMatrix, g_rotate[1], 1, 0, 0);
     rotate(g_transformData.ModelViewMatrix, g_rotate[0], 0, 1, 0);
-    if (!g_yup) {
-        rotate(g_transformData.ModelViewMatrix, -90, 1, 0, 0);
-    }
+    rotate(g_transformData.ModelViewMatrix, -90, 1, 0, 0);
     translate(g_transformData.ModelViewMatrix,
               -g_center[0], -g_center[1], -g_center[2]);
     perspective(g_transformData.ProjectionMatrix,
@@ -1129,7 +1078,7 @@ display() {
     inverseMatrix(g_transformData.ModelViewInverseMatrix,
                   g_transformData.ModelViewMatrix);
 
-    // make sure that the vertex buffer is interoped back as a GL resource.
+    // make sure that the vertex buffer is interoped back as a GL resources.
     GLuint vbo = g_mesh->BindVertexBuffer();
 
     // vertex texture update for legacy gregory drawing
@@ -1222,7 +1171,7 @@ display() {
 
     g_fpsTimer.Stop();
     float elapsed = (float)g_fpsTimer.GetElapsed();
-    if (! g_freeze) {
+    if (not g_freeze) {
         g_animTime += elapsed;
     }
     g_fpsTimer.Start();
@@ -1234,26 +1183,18 @@ display() {
         double fps = 1.0/elapsed;
 
         if (g_displayPatchCounts) {
-            int x = -420;
-            int y = g_legacyGregoryEnabled ? -180 : -140;
-            g_hud.DrawString(x, y, "Quads            : %d",
+            int x = -280;
+            int y = -180;
+            g_hud.DrawString(x, y, "NonPatch         : %d",
                              patchCount[Descriptor::QUADS]); y += 20;
-            g_hud.DrawString(x, y, "Triangles        : %d",
-                             patchCount[Descriptor::TRIANGLES]); y += 20;
             g_hud.DrawString(x, y, "Regular          : %d",
                              patchCount[Descriptor::REGULAR]); y+= 20;
-            g_hud.DrawString(x, y, "Loop             : %d",
-                             patchCount[Descriptor::LOOP]); y+= 20;
-            if (g_legacyGregoryEnabled) {
-                g_hud.DrawString(x, y, "Gregory          : %d",
-                                 patchCount[Descriptor::GREGORY]); y+= 20;
-                g_hud.DrawString(x, y, "Gregory Boundary : %d",
-                                 patchCount[Descriptor::GREGORY_BOUNDARY]); y+= 20;
-            }
+            g_hud.DrawString(x, y, "Gregory          : %d",
+                             patchCount[Descriptor::GREGORY]); y+= 20;
+            g_hud.DrawString(x, y, "Boundary Gregory : %d",
+                             patchCount[Descriptor::GREGORY_BOUNDARY]); y+= 20;
             g_hud.DrawString(x, y, "Gregory Basis    : %d",
                              patchCount[Descriptor::GREGORY_BASIS]); y+= 20;
-            g_hud.DrawString(x, y, "Gregory Triangle : %d",
-                             patchCount[Descriptor::GREGORY_TRIANGLE]); y+= 20;
         }
 
         int y = -220;
@@ -1293,7 +1234,7 @@ motion(GLFWwindow *, double dx, double dy) {
         // pan
         g_pan[0] -= g_dolly*(x - g_prev_x)/g_width;
         g_pan[1] += g_dolly*(y - g_prev_y)/g_height;
-    } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) ||
+    } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) or
                (!g_mbutton[0] && g_mbutton[1] && !g_mbutton[2])) {
         // dolly
         g_dolly -= g_dolly*0.01f*(x - g_prev_x);
@@ -1387,9 +1328,9 @@ callbackDisplayStyle(int b) {
 
 static void
 callbackShadingMode(int b) {
-    if (g_shadingMode == kShadingVaryingColor || b == kShadingVaryingColor ||
-        g_shadingMode == kShadingInterleavedVaryingColor || b == kShadingInterleavedVaryingColor ||
-        g_shadingMode == kShadingFaceVaryingColor || b == kShadingFaceVaryingColor) {
+    if (g_shadingMode == kShadingVaryingColor or b == kShadingVaryingColor or
+        g_shadingMode == kShadingInterleavedVaryingColor or b == kShadingInterleavedVaryingColor or
+        g_shadingMode == kShadingFaceVaryingColor or b == kShadingFaceVaryingColor) {
         // need to rebuild for varying reconstruct
         g_shadingMode = b;
         rebuildMesh();
@@ -1409,7 +1350,7 @@ callbackKernel(int k) {
     g_kernel = k;
 
 #ifdef OPENSUBDIV_HAS_OPENCL
-    if (g_kernel == kCL && (!g_clDeviceContext.IsInitialized())) {
+    if (g_kernel == kCL and (not g_clDeviceContext.IsInitialized())) {
         if (g_clDeviceContext.Initialize() == false) {
             printf("Error in initializing OpenCL\n");
             exit(1);
@@ -1417,7 +1358,7 @@ callbackKernel(int k) {
     }
 #endif
 #ifdef OPENSUBDIV_HAS_CUDA
-    if (g_kernel == kCUDA && (!g_cudaDeviceContext.IsInitialized())) {
+    if (g_kernel == kCUDA and (not g_cudaDeviceContext.IsInitialized())) {
         if (g_cudaDeviceContext.Initialize() == false) {
             printf("Error in initializing Cuda\n");
             exit(1);
@@ -1455,16 +1396,8 @@ callbackCheckBox(bool checked, int button) {
             g_adaptive = checked;
             rebuildMesh();
             return;
-        case kHUD_CB_SMOOTH_CORNER_PATCH:
-            g_smoothCornerPatch = checked;
-            rebuildMesh();
-            return;
         case kHUD_CB_SINGLE_CREASE_PATCH:
             g_singleCreasePatch = checked;
-            rebuildMesh();
-            return;
-        case kHUD_CB_INF_SHARP_PATCH:
-            g_infSharpPatch = checked;
             rebuildMesh();
             return;
         default:
@@ -1564,9 +1497,6 @@ initHUD() {
     g_hud.AddPullDownButton(shading_pulldown, "Patch Type",
                             kShadingPatchType,
                             g_shadingMode == kShadingPatchType);
-    g_hud.AddPullDownButton(shading_pulldown, "Patch Depth",
-                            kShadingPatchDepth,
-                            g_shadingMode == kShadingPatchDepth);
     g_hud.AddPullDownButton(shading_pulldown, "Patch Coord",
                             kShadingPatchCoord,
                             g_shadingMode == kShadingPatchCoord);
@@ -1601,35 +1531,29 @@ initHUD() {
     if (GLUtils::SupportsAdaptiveTessellation()) {
         g_hud.AddCheckBox("Adaptive (`)", g_adaptive!=0,
                           10, 190, callbackCheckBox, kHUD_CB_ADAPTIVE, '`');
-        g_hud.AddCheckBox("Smooth Corner Patch (O)", g_smoothCornerPatch!=0,
-                          10, 210, callbackCheckBox, kHUD_CB_SMOOTH_CORNER_PATCH, 'o');
         g_hud.AddCheckBox("Single Crease Patch (S)", g_singleCreasePatch!=0,
-                          10, 230, callbackCheckBox, kHUD_CB_SINGLE_CREASE_PATCH, 's');
-        g_hud.AddCheckBox("Inf Sharp Patch (I)", g_infSharpPatch!=0,
-                          10, 250, callbackCheckBox, kHUD_CB_INF_SHARP_PATCH, 'i');
+                          10, 210, callbackCheckBox, kHUD_CB_SINGLE_CREASE_PATCH, 's');
 
         int endcap_pulldown = g_hud.AddPullDown(
-            "End cap (E)", 10, 270, 200, callbackEndCap, 'e');
-        g_hud.AddPullDownButton(endcap_pulldown,"Linear",
-                                kEndCapBilinearBasis,
-                                g_endCap == kEndCapBilinearBasis);
-        g_hud.AddPullDownButton(endcap_pulldown, "Regular",
+            "End cap (E)", 10, 230, 200, callbackEndCap, 'e');
+        g_hud.AddPullDownButton(endcap_pulldown,"None",
+                                kEndCapNone,
+                                g_endCap == kEndCapNone);
+        g_hud.AddPullDownButton(endcap_pulldown, "BSpline",
                                 kEndCapBSplineBasis,
                                 g_endCap == kEndCapBSplineBasis);
-        g_hud.AddPullDownButton(endcap_pulldown, "Gregory",
+        g_hud.AddPullDownButton(endcap_pulldown, "GregoryBasis",
                                 kEndCapGregoryBasis,
                                 g_endCap == kEndCapGregoryBasis);
-        if (g_legacyGregoryEnabled) {
-            g_hud.AddPullDownButton(endcap_pulldown, "LegacyGregory",
-                                    kEndCapLegacyGregory,
-                                    g_endCap == kEndCapLegacyGregory);
-        }
+        g_hud.AddPullDownButton(endcap_pulldown, "LegacyGregory",
+                                kEndCapLegacyGregory,
+                                g_endCap == kEndCapLegacyGregory);
     }
 
     for (int i = 1; i < 11; ++i) {
         char level[16];
         sprintf(level, "Lv. %d", i);
-        g_hud.AddRadioButton(3, level, i == g_level, 10, 310+i*20, callbackLevel, i, '0'+(i%10));
+        g_hud.AddRadioButton(3, level, i==2, 10, 310+i*20, callbackLevel, i, '0'+(i%10));
     }
 
     int shapes_pulldown = g_hud.AddPullDown("Shape (N)", -300, 10, 300, callbackModel, 'n');
@@ -1637,7 +1561,7 @@ initHUD() {
         g_hud.AddPullDownButton(shapes_pulldown, g_defaultShapes[i].name.c_str(),i);
     }
 
-    g_hud.AddCheckBox("Show patch counts", g_displayPatchCounts!=0, -420, -20, callbackCheckBox, kHUD_CB_DISPLAY_PATCH_COUNTS);
+    g_hud.AddCheckBox("Show patch counts", g_displayPatchCounts!=0, -280, -20, callbackCheckBox, kHUD_CB_DISPLAY_PATCH_COUNTS);
 
     g_hud.Rebuild(windowWidth, windowHeight, frameBufferWidth, frameBufferHeight);
 }
@@ -1660,20 +1584,20 @@ initGL() {
 static void
 idle() {
 
-    if (! g_freeze) {
+    if (not g_freeze) {
         g_frame++;
         updateGeom();
     }
 
-    if (g_repeatCount != 0 && g_frame >= g_repeatCount)
+    if (g_repeatCount != 0 and g_frame >= g_repeatCount)
         g_running = 0;
 }
 
 //------------------------------------------------------------------------------
 static void
 callbackErrorOsd(OpenSubdiv::Far::ErrorType err, const char *message) {
-    printf("OpenSubdiv Error: %d\n", err);
-    printf("    %s\n", message);
+    printf("Error: %d\n", err);
+    printf("%s", message);
 }
 
 //------------------------------------------------------------------------------
@@ -1683,31 +1607,46 @@ callbackErrorGLFW(int error, const char* description) {
 }
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-
 int main(int argc, char ** argv) {
 
-    ArgOptions args;
-        
-    args.Parse(argc, argv);
+    bool fullscreen = false;
+    std::string str;
+    std::vector<char const *> animobjs;
 
-    g_yup = args.GetYUp();
-    g_adaptive = args.GetAdaptive();
-    g_level = args.GetLevel();
-    g_repeatCount = args.GetRepeatCount();
-
-    // Parse remaining args
-    const std::vector<const char *> &rargs = args.GetRemainingArgs();
-    for (size_t i = 0; i < rargs.size(); ++i) {
-
-        if (!strcmp(rargs[i], "-lg")) {
-            g_legacyGregoryEnabled = true;
-        } else {
-            args.PrintUnrecognizedArgWarning(rargs[i]);
+    for (int i = 1; i < argc; ++i) {
+        if (strstr(argv[i], ".obj")) {
+            animobjs.push_back(argv[i]);
+        }
+        else if (!strcmp(argv[i], "-axis")) {
+            g_axis = false;
+        }
+        else if (!strcmp(argv[i], "-d")) {
+            g_level = atoi(argv[++i]);
+        }
+        else if (!strcmp(argv[i], "-c")) {
+            g_repeatCount = atoi(argv[++i]);
+        }
+        else if (!strcmp(argv[i], "-f")) {
+            fullscreen = true;
+        }
+        else {
+            std::ifstream ifs(argv[1]);
+            if (ifs) {
+                std::stringstream ss;
+                ss << ifs.rdbuf();
+                ifs.close();
+                str = ss.str();
+                g_defaultShapes.push_back(ShapeDesc(argv[1], str.c_str(), kCatmark));
+            }
         }
     }
 
-    ViewerArgsUtils::PopulateShapesOrAnimShapes(
-        args, &g_defaultShapes, &g_objAnim);
+    if (not animobjs.empty()) {
+
+        g_defaultShapes.push_back(ShapeDesc(animobjs[0], "", kCatmark));
+
+        g_objAnim = ObjAnim::Create(animobjs, g_axis);
+    }
 
     initShapes();
 
@@ -1716,7 +1655,7 @@ int main(int argc, char ** argv) {
     OpenSubdiv::Far::SetErrorCallback(callbackErrorOsd);
 
     glfwSetErrorCallback(callbackErrorGLFW);
-    if (! glfwInit()) {
+    if (not glfwInit()) {
         printf("Failed to initialize GLFW\n");
         return 1;
     }
@@ -1725,13 +1664,13 @@ int main(int argc, char ** argv) {
 
     GLUtils::SetMinimumGLVersion(argc, argv);
 
-    if (args.GetFullScreen()) {
+    if (fullscreen) {
 
         g_primary = glfwGetPrimaryMonitor();
 
         // apparently glfwGetPrimaryMonitor fails under linux : if no primary,
         // settle for the first one in the list
-        if (! g_primary) {
+        if (not g_primary) {
             int count = 0;
             GLFWmonitor ** monitors = glfwGetMonitors(&count);
 
@@ -1747,20 +1686,18 @@ int main(int argc, char ** argv) {
     }
 
     g_window = glfwCreateWindow(g_width, g_height, windowTitle,
-        args.GetFullScreen() && g_primary ? g_primary : NULL, NULL);
+        fullscreen and g_primary ? g_primary : NULL, NULL);
 
-    if (! g_window) {
+    if (not g_window) {
         std::cerr << "Failed to create OpenGL context.\n";
         glfwTerminate();
         return 1;
     }
 
     glfwMakeContextCurrent(g_window);
-
-    GLUtils::InitializeGL();
     GLUtils::PrintGLVersion();
 
-    // accommodate high DPI displays (e.g. mac retina displays)
+    // accommocate high DPI displays (e.g. mac retina displays)
     glfwGetFramebufferSize(g_window, &g_width, &g_height);
     glfwSetFramebufferSizeCallback(g_window, reshape);
 
@@ -1769,10 +1706,23 @@ int main(int argc, char ** argv) {
     glfwSetMouseButtonCallback(g_window, mouse);
     glfwSetWindowCloseCallback(g_window, windowClose);
 
-    // activate feature adaptive tessellation if OSD supports it
-    if (g_adaptive) {
-        g_adaptive = GLUtils::SupportsAdaptiveTessellation();
+#if defined(OSD_USES_GLEW)
+#ifdef CORE_PROFILE
+    // this is the only way to initialize glew correctly under core profile context.
+    glewExperimental = true;
+#endif
+    if (GLenum r = glewInit() != GLEW_OK) {
+        printf("Failed to initialize glew. Error = %s\n", glewGetErrorString(r));
+        exit(1);
     }
+#ifdef CORE_PROFILE
+    // clear GL errors which was generated during glewInit()
+    glGetError();
+#endif
+#endif
+
+    // activate feature adaptive tessellation if OSD supports it
+    g_adaptive = GLUtils::SupportsAdaptiveTessellation();
 
     initGL();
 

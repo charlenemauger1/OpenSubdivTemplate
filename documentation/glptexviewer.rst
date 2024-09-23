@@ -35,14 +35,21 @@ SYNOPSIS
 .. parsed-literal:: 
    :class: codefhead
 
-   **glPtexViewer** [**-f**] [**-yup**] [**-u**] [**-a**] [**-l** *isolation level*] [**-c** *animation loops*]
-       [**-e** *environment map*] [**-d** *HDR diffuse map*] [**-s** *HDR specular map*]
-       [**--disp** *displacement scale*] [**--bump** *bump scale*]
-       *ptex color file*
-       *ptex displacement file*
-       *ptex occlusion file*
-       *ptex specular file*
-       *objfile(s)*
+   **glPtexViewer** 
+   [**-e** *environment map*]
+   [**-d** *HDR diffuse map*]
+   [**-s** *HDR specular map*]
+   [**-y**]
+   [**--disp** *displacement scale*]
+   [**--bump** *bump scale*]
+   [**-l** *isolation level*] 
+   [**-c** *animation loops*] 
+   [**-f**] 
+   *ptex color file*
+   *ptex displacement file*
+   *ptex occlusion file*
+   *ptex specular file*
+   *objfile(s)*
 
 DESCRIPTION
 ===========
@@ -58,10 +65,6 @@ are available to experiment with the algorithms.
 
 OPTIONS
 =======
-
-See the description of the
-`common comand line options <code_examples.html#common-command-line-options>`__
-for the subset of common options supported here.
 
 **-e** *environment map*
   A low dynamic range spherical environment map used as a background. Ideally,
@@ -80,6 +83,20 @@ for the subset of common options supported here.
 **--bump** *displacement scale*
   A scalar multiplier for the shader bump values.
 
+**-y**
+  Swap Z-up geometry to Y-UP.
+
+**-l** *isolation level*
+  Select the desired isolation level of adaptive feature isolation. This can be 
+  useful when trying to load large pieces of geometry.
+
+**-c** *animation frequency*
+  Number of repetitions of the animation loop (default=0 is infinite)
+
+**-f**
+  Launches the application in full-screen mode (if is supported by GLFW on the
+  OS)
+
 *ptex color file*
   A ptex file containing RGB channels read as material albedo color.
   
@@ -95,7 +112,12 @@ for the subset of common options supported here.
   A single-channel ptex file (preferably 8 bits precision) applied to modulate
   the specular reflectance of the material
   
-KEYBOARD CONTROLS
+*objfile(s)*
+  A sequence of obj files used as an animation loop (the topology has to match
+  the data contained in all the ptex files !)
+
+
+Keyboard Controls
 =================
 
    .. code:: c++
@@ -107,6 +129,7 @@ KEYBOARD CONTROLS
       +/-    : increase / decrease tessellation rate
       r      : reload and re-compile the shader files
       e      : draw normals
+
 
 
 .. include:: examples_see_also.rst

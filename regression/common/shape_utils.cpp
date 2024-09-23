@@ -35,7 +35,7 @@
 //------------------------------------------------------------------------------
 static char const * sgets( char * s, int size, char ** stream ) {
     for (int i=0; i<size; ++i) {
-        if ( (*stream)[i]=='\n' || (*stream)[i]=='\0') {
+        if ( (*stream)[i]=='\n' or (*stream)[i]=='\0') {
 
             memcpy(s, *stream, i);
             s[i]='\0';
@@ -61,8 +61,8 @@ Shape::~Shape() {
 }
 
 //------------------------------------------------------------------------------
-Shape * Shape::parseObj(char const * shapestr, Scheme shapescheme, bool isLeftHanded,
-                        bool parsemtl) {
+Shape * Shape::parseObj(char const * shapestr, Scheme shapescheme,
+                        bool isLeftHanded, int axis, bool parsemtl) {
 
     Shape * s = new Shape;
 
@@ -71,19 +71,21 @@ Shape * Shape::parseObj(char const * shapestr, Scheme shapescheme, bool isLeftHa
 
     char * str=const_cast<char *>(shapestr), line[256], buf[256], usemtl=-1;
     bool done = false;
-    while (! done) {
+    while (not done) {
         done = sgets(line, sizeof(line), &str)==0;
-        if (line[0]) {
-          char* end = &line[strlen(line)-1];
-          if (*end == '\n') *end = '\0'; // strip trailing nl
-        }
+        char* end = &line[strlen(line)-1];
+        if (*end == '\n') *end = '\0'; // strip trailing nl
         float x, y, z, u, v;
         switch (line[0]) {
             case 'v': switch (line[1]) {
                           case ' ': if (sscanf(line, "v %f %f %f", &x, &y, &z) == 3) {
                                          s->verts.push_back(x);
-                                         s->verts.push_back(y);
-                                         s->verts.push_back(z);
+                                         switch( axis ) {
+                                             case 0 : s->verts.push_back(-z);
+                                                      s->verts.push_back(y); break;
+                                             case 1 : s->verts.push_back(y);
+                                                      s->verts.push_back(z); break;
+                                         }
                                     } break;
                           case 't': if (sscanf(line, "vt %f %f", &u, &v) == 2) {
                                         s->uvs.push_back(u);
@@ -109,7 +111,7 @@ Shape * Shape::parseObj(char const * shapestr, Scheme shapescheme, bool isLeftHa
                               while (*cp == ' ') cp++;
                           }
                           s->nvertsPerFace.push_back(nverts);
-                          if (! s->mtls.empty()) {
+                          if (not s->mtls.empty()) {
                               s->mtlbind.push_back(usemtl);
                           }
                       } break;
@@ -118,10 +120,10 @@ Shape * Shape::parseObj(char const * shapestr, Scheme shapescheme, bool isLeftHa
                            if (t)
                                s->tags.push_back(t);
                        } break;
-            case 'u' : if (parsemtl && sscanf(line, "usemtl %s", buf)==1) {
+            case 'u' : if (parsemtl and sscanf(line, "usemtl %s", buf)==1) {
                            usemtl = s->FindMaterial(buf);
                        } break;
-            case 'm' : if (parsemtl && sscanf(line, "mtllib %s", buf)==1) {
+            case 'm' : if (parsemtl and sscanf(line, "mtllib %s", buf)==1) {
                            std::ifstream ifs(buf);
                            if (ifs) {
                                std::stringstream ss;
@@ -135,12 +137,6 @@ Shape * Shape::parseObj(char const * shapestr, Scheme shapescheme, bool isLeftHa
         }
     }
     return s;
-}
-
-//------------------------------------------------------------------------------
-Shape * Shape::parseObj(ShapeDesc const & shapeDesc, bool parsemtl) {
-    return parseObj(shapeDesc.data.c_str(), shapeDesc.scheme, shapeDesc.isLeftHanded,
-                    parsemtl);
 }
 
 //------------------------------------------------------------------------------
@@ -214,7 +210,7 @@ void Shape::parseMtllib(char const * mtlstr) {
 
     bool done = false;
     float r, g, b, a;
-    while (! done) {
+    while (not done) {
         done = sgets(line, sizeof(line), &str)==0;
         char* end = &line[strlen(line)-1];
         if (*end == '\n') *end = '\0'; // strip trailing nl

@@ -22,8 +22,6 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
-
 #include "glHud.h"
 #include "glUtils.h"
 
@@ -123,7 +121,7 @@ static const char *s_BG_FS =
     "varying vec2 uv;\n"
     "void main() {\n"
     "  gl_FragColor = vec4(mix(0.1, 0.5, sin((uv.y*0.5+0.5)*3.14159)));\n"
-    "  gl_FragColor.a = 1.0;\n"
+    "  gl_FragColor.a = 1.0;\n";
     "}\n";
 #endif
 
@@ -248,7 +246,7 @@ GLhud::Rebuild(int width, int height,
                int framebufferWidth, int framebufferHeight) {
     Hud::Rebuild(width, height, framebufferWidth, framebufferHeight);
 
-    if (! _staticVbo)
+    if (not _staticVbo)
         return;
 
     _staticVboSize = (int)getStaticVboSource().size();

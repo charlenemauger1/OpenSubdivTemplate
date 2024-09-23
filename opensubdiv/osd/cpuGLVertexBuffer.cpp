@@ -22,12 +22,11 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
-
 #include "../osd/cpuGLVertexBuffer.h"
 
 #include <string.h>
 
+#include "../osd/opengl.h"
 
 namespace OpenSubdiv {
 namespace OPENSUBDIV_VERSION {
@@ -37,9 +36,6 @@ namespace Osd {
 CpuGLVertexBuffer::CpuGLVertexBuffer(int numElements, int numVertices)
     : _numElements(numElements), _numVertices(numVertices),
       _vbo(0), _cpuBuffer(0), _dataDirty(true) {
-
-    // Initialize internal OpenGL loader library if necessary
-    OpenSubdiv::internal::GLLoader::libraryInitializeGL();
 }
 
 CpuGLVertexBuffer::~CpuGLVertexBuffer() {
@@ -92,12 +88,12 @@ CpuGLVertexBuffer::BindCpuBuffer() {
 GLuint
 CpuGLVertexBuffer::BindVBO(void * /*deviceContext*/) {
 
-    if (! _dataDirty)
+    if (not _dataDirty)
         return _vbo;
 
-    int size = GetNumElements() * GetNumVertices() * (int) sizeof(float);
+    int size = GetNumElements() * GetNumVertices() * sizeof(float);
 
-    if (! _vbo) {
+    if (not _vbo) {
         glGenBuffers(1, &_vbo);
     }
 

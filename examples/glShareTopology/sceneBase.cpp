@@ -22,16 +22,11 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
-
 #include "sceneBase.h"
-
-#include "../../regression/common/far_utils.h"
-
-#include <opensubdiv/far/patchTableFactory.h>
-#include <opensubdiv/far/stencilTableFactory.h>
-
 #include <limits>
+#include "../../regression/common/far_utils.h"
+#include <far/patchTableFactory.h>
+#include <far/stencilTableFactory.h>
 
 using namespace OpenSubdiv;
 
@@ -174,7 +169,7 @@ SceneBase::createStencilTable(Shape const *shape, int level, bool varying,
 
     _stencilTableSize = createMeshRefiner(vertexStencils, varyingStencils,
                                           numControlVertices);
-    // note: refiner takes ownership of vertexStencils, varyingStencils, patchTable
+    // note: refiner takes ownerships of vertexStencils/ varyingStencils, patchTable
 
     delete refiner;
     return numControlVertices + vertexStencils->GetNumStencils();

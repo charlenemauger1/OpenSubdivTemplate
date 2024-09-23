@@ -46,7 +46,7 @@ ObjAnim::InterpolatePositions(float time, float * positions, int stride) const {
 
     assert(positions);
 
-    if ( _positions.empty() || (! _shape)) {
+    if ( _positions.empty() or (not _shape)) {
         //printf("Error: InterpolatePositions on unfit ObjAnim instance\n");
         return;
     }
@@ -88,13 +88,13 @@ ObjAnim::InterpolatePositions(float time, float * positions, int stride) const {
 }
 
 ObjAnim const *
-ObjAnim::Create(std::vector<char const *> objFiles, Scheme scheme, bool isLeftHanded) {
+ObjAnim::Create(std::vector<char const *> objFiles, bool axis) {
 
     ObjAnim * anim=0;
 
     Shape const * shape = 0;
 
-    if (! objFiles.empty()) {
+    if (not objFiles.empty()) {
 
         anim = new ObjAnim;
 
@@ -102,7 +102,7 @@ ObjAnim::Create(std::vector<char const *> objFiles, Scheme scheme, bool isLeftHa
 
         for (int i = 0; i < (int)objFiles.size(); ++i) {
 
-            if (! objFiles[i]) {
+            if (not objFiles[i]) {
                 continue;
             }
 
@@ -118,7 +118,7 @@ ObjAnim::Create(std::vector<char const *> objFiles, Scheme scheme, bool isLeftHa
                 fflush(stdout);
                 std::string str = ss.str();
 
-                shape = Shape::parseObj(str.c_str(), scheme, isLeftHanded);
+                shape = Shape::parseObj(str.c_str(), kCatmark, false, axis);
 
                 if (i==0) {
 

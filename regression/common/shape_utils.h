@@ -30,24 +30,10 @@
 #include <map>
 
 //------------------------------------------------------------------------------
-
 enum Scheme {
   kBilinear=0,
   kCatmark,
   kLoop
-};
-
-struct ShapeDesc 
-{
-    ShapeDesc(char const * iname, std::string const & idata, Scheme ischeme,
-        bool iIsLeftHanded = false) :
-        name(iname), data(idata), scheme(ischeme), isLeftHanded(iIsLeftHanded) 
-	{ }
-
-    std::string name;
-    std::string data;
-    Scheme      scheme;
-    bool        isLeftHanded;
 };
 
 //------------------------------------------------------------------------------
@@ -66,7 +52,7 @@ struct Shape {
               ns,            // specular exponent
               ni,            // optical density (1.0=no refraction, glass=1.5)
               sharpness,     // reflection sharpness
-              tf[3],         // transmission filter
+              tf[3],         // transimission filter
               d;             // dissolve factor (1.0 = opaque)
 
         int illum;
@@ -84,9 +70,8 @@ struct Shape {
         std::vector<std::string> stringargs;
     };
 
-    static Shape * parseObj(ShapeDesc const & shapeDesc, bool parsemtl=false);
-    static Shape * parseObj(char const * shapeString, Scheme shapeScheme,
-                            bool isLeftHanded=false, bool parsemtl=false);
+    static Shape * parseObj(char const * Shapestr, Scheme schme,
+        bool isLeftHanded=false, int axis=1, bool parsemtl=false);
 
     void parseMtllib(char const * stream);
 
@@ -104,7 +89,7 @@ struct Shape {
 
     int GetNumFaces() const { return (int)nvertsPerFace.size(); }
 
-    bool HasUV() const { return ! (uvs.empty() || faceuvs.empty()); }
+    bool HasUV() const { return not (uvs.empty() or faceuvs.empty()); }
 
     int GetFVarWidth() const { return HasUV() ? 2 : 0; }
 
@@ -122,7 +107,7 @@ struct Shape {
     char FindMaterial(char const * name) {
         for (int i=0; i<(int)mtls.size(); ++i) {
             if (mtls[i]->name==name) {
-                return (char) i;
+                return i;
             }
         }
         return -1;

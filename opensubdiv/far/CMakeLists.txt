@@ -25,12 +25,12 @@
 #-------------------------------------------------------------------------------
 # source & headers
 set(SOURCE_FILES
-    bilinearPatchBuilder.cpp
-    catmarkPatchBuilder.cpp
     error.cpp
-    loopPatchBuilder.cpp
+    endCapBSplineBasisPatchFactory.cpp
+    endCapGregoryBasisPatchFactory.cpp
+    endCapLegacyGregoryPatchFactory.cpp
+    gregoryBasis.cpp
     patchBasis.cpp
-    patchBuilder.cpp
     patchDescriptor.cpp
     patchMap.cpp
     patchTable.cpp
@@ -45,12 +45,11 @@ set(SOURCE_FILES
 )
 
 set(PRIVATE_HEADER_FILES
-    bilinearPatchBuilder.h
-    catmarkPatchBuilder.h
-    loopPatchBuilder.h
+    gregoryBasis.h
+    endCapBSplineBasisPatchFactory.h
+    endCapGregoryBasisPatchFactory.h
+    endCapLegacyGregoryPatchFactory.h
     patchBasis.h
-    patchBuilder.h
-    sparseMatrix.h
     stencilBuilder.h
 )
 
@@ -85,15 +84,10 @@ if (NOT NO_LIB)
             ${PUBLIC_HEADER_FILES}
     )
 
-    set_target_properties(far_obj
-        PROPERTIES
-            FOLDER "opensubdiv"
-    )
-
 endif()
 
 #-------------------------------------------------------------------------------
-osd_add_doxy_headers( "${DOXY_HEADER_FILES}" )
+_add_doxy_headers( "${DOXY_HEADER_FILES}" )
 
 install(
     FILES

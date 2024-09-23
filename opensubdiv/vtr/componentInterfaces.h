@@ -46,7 +46,7 @@ namespace internal {
 //
 //  These are not used with Vtr but arguably belong with it as the details to
 //  write these efficiently depends very much on intimate details of Vtr's
-//  implementation, e.g. the use of tag bits, subdivision Rules, etc.
+//  implmentation, e.g. the use of tag bits, subdivision Rules, etc.
 //
 
 

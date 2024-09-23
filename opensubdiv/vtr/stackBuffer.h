@@ -33,20 +33,20 @@ namespace Vtr {
 namespace internal {
 
 //
-//  The StackBuffer class is intended solely to take the place of VLAs (Variable
+//  The StackBuffer class is intented solely to take the place of VLA's (Variable
 //  Length Arrays) which most compilers support, but are not strictly standard C++.
 //  Portability concerns forces us to make use of either alloca() or some other
 //  mechanism to create small arrays on the stack that are typically based on the
-//  valence of a vertex -- small in general, but occasionally large.
+//  valence of a vertex -- small in general, but occassionally large.
 //
-//  Note also that since the intent of this is to replace VLAs -- not general
+//  Note also that since the intent of this is to replace VLA's -- not general
 //  std::vectors -- support for std::vector functionality is intentionally limited
 //  and STL-like naming is avoided.  Like a VLA there is no incremental growth.
 //  Support for resizing is available to reuse an instance at the beginning of a
 //  loop with a new size, but resizing in this case reinitializes all elements.
 //
 
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE = false>
+template <typename TYPE, unsigned int SIZE>
 class StackBuffer
 {
 public:
@@ -74,8 +74,8 @@ public:
 
 private:
     //  Non-copyable:
-    StackBuffer(const StackBuffer<TYPE,SIZE,POD_TYPE> &) { }
-    StackBuffer& operator=(const StackBuffer<TYPE,SIZE,POD_TYPE> &) { return *this; }
+    StackBuffer(const StackBuffer<TYPE,SIZE> &) { }
+    StackBuffer& operator=(const StackBuffer<TYPE,SIZE> &) { return *this; }
 
     void allocate(size_type capacity);
     void deallocate();
@@ -97,9 +97,9 @@ private:
 //
 //  Core allocation/deallocation methods:
 //
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE>
+template <typename TYPE, unsigned int SIZE>
 inline void
-StackBuffer<TYPE,SIZE,POD_TYPE>::allocate(size_type capacity) {
+StackBuffer<TYPE,SIZE>::allocate(size_type capacity) {
 
     //  Again, is alignment an issue here?  C++ spec says new will return pointer
     //  "suitably aligned" for conversion to pointers of other types, which implies
@@ -110,9 +110,9 @@ StackBuffer<TYPE,SIZE,POD_TYPE>::allocate(size_type capacity) {
     _capacity = capacity;
 }
 
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE>
+template <typename TYPE, unsigned int SIZE>
 inline void
-StackBuffer<TYPE,SIZE,POD_TYPE>::deallocate() {
+StackBuffer<TYPE,SIZE>::deallocate() {
 
     ::operator delete(_dynamicData);
 
@@ -121,22 +121,20 @@ StackBuffer<TYPE,SIZE,POD_TYPE>::deallocate() {
 }
 
 //
-//  Explicit element-wise construction and destruction within allocated memory.
-//  Compilers do not always optimize out the iteration here even when there is
-//  no construction or destruction, so the POD_TYPE arguement can be used to
-//  force this when/if it becomes an issue (and it has been in some cases).
+//  Explicit element-wise construction and destruction within allocated memory (we
+//  rely on the compiler to remove this code for types with empty constructors):
 //
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE>
+template <typename TYPE, unsigned int SIZE>
 inline void
-StackBuffer<TYPE,SIZE,POD_TYPE>::construct() {
+StackBuffer<TYPE,SIZE>::construct() {
 
     for (size_type i = 0; i < _size; ++i) {
         (void) new (&_data[i]) TYPE;
     }
 }
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE>
+template <typename TYPE, unsigned int SIZE>
 inline void
-StackBuffer<TYPE,SIZE,POD_TYPE>::destruct() {
+StackBuffer<TYPE,SIZE>::destruct() {
 
     for (size_type i = 0; i < _size; ++i) {
         _data[i].~TYPE();
@@ -146,9 +144,9 @@ StackBuffer<TYPE,SIZE,POD_TYPE>::destruct() {
 //
 //  Inline constructors and destructor:
 //
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE>
+template <typename TYPE, unsigned int SIZE>
 inline
-StackBuffer<TYPE,SIZE,POD_TYPE>::StackBuffer() :
+StackBuffer<TYPE,SIZE>::StackBuffer() :
     _data(reinterpret_cast<TYPE*>(_staticData)),
     _size(0),
     _capacity(SIZE),
@@ -156,9 +154,9 @@ StackBuffer<TYPE,SIZE,POD_TYPE>::StackBuffer() :
 
 }
 
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE>
+template <typename TYPE, unsigned int SIZE>
 inline
-StackBuffer<TYPE,SIZE,POD_TYPE>::StackBuffer(size_type size) :
+StackBuffer<TYPE,SIZE>::StackBuffer(size_type size) :
     _data(reinterpret_cast<TYPE*>(_staticData)),
     _size(size),
     _capacity(SIZE),
@@ -167,44 +165,36 @@ StackBuffer<TYPE,SIZE,POD_TYPE>::StackBuffer(size_type size) :
     if (size > SIZE) {
         allocate(size);
     }
-    if (!POD_TYPE) {
-        construct();
-    }
+    construct();
 }
 
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE>
+template <typename TYPE, unsigned int SIZE>
 inline
-StackBuffer<TYPE,SIZE,POD_TYPE>::~StackBuffer() {
+StackBuffer<TYPE,SIZE>::~StackBuffer() {
 
-    if (!POD_TYPE) {
-        destruct();
-    }
+    destruct();
     deallocate();
 }
 
 //
 //  Inline sizing methods:
 //
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE>
+template <typename TYPE, unsigned int SIZE>
 inline void
-StackBuffer<TYPE,SIZE,POD_TYPE>::Reserve(size_type capacity) {
+StackBuffer<TYPE,SIZE>::Reserve(size_type capacity) {
 
     if (capacity > _capacity) {
-        if (!POD_TYPE) {
-            destruct();
-        }
+        destruct();
         deallocate();
         allocate(capacity);
     }
 }
 
-template <typename TYPE, unsigned int SIZE, bool POD_TYPE>
+template <typename TYPE, unsigned int SIZE>
 inline void
-StackBuffer<TYPE,SIZE,POD_TYPE>::SetSize(size_type size)
+StackBuffer<TYPE,SIZE>::SetSize(size_type size)
 {
-    if (!POD_TYPE) {
-        destruct();
-    }
+    destruct();
     if (size == 0) {
         deallocate();
     } else if (size > _capacity) {
@@ -212,9 +202,7 @@ StackBuffer<TYPE,SIZE,POD_TYPE>::SetSize(size_type size)
         allocate(size);
     }
     _size = size;
-    if (!POD_TYPE) {
-        construct();
-    }
+    construct();
 }
 
 } // end namespace internal

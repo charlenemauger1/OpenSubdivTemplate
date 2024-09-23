@@ -112,21 +112,6 @@ public:
     ///
     static TopologyRefiner* Create(MESH const& mesh, Options options = Options());
 
-    /// \brief Instantiates a TopologyRefiner from the base level of an
-    ///        existing instance.
-    ///
-    ///  This allows lightweight copies of the same topology to be refined
-    ///  differently for each new instance.  As with other classes that refer
-    ///  to an existing TopologyRefiner, it must generally exist for the entire
-    ///  lifetime of the new instance.  In this case, the base level of the
-    ///  original instance must be preserved.
-    ///
-    /// @param baseLevel  An existing TopologyRefiner to share base level.
-    ///
-    /// @return           A new instance of TopologyRefiner or 0 for failure
-    ///
-    static TopologyRefiner* Create(TopologyRefiner const & baseLevel);
-
 protected:
     typedef Vtr::internal::Level::TopologyError TopologyError;
 
@@ -176,7 +161,7 @@ protected:
     ///  the vertices for that face.
     ///
     ///  If a full boundary representation with all neighborhood information is not
-    ///  available, e.g. faces and vertices are available but not edges, only the
+    ///  available, e.g. faces and vertices are avaible but not edges, only the
     ///  face-vertices should be specified.  The remaining topological relationships
     ///  will be constructed later in the assembly (though at greater cost than if
     ///  specified directly).
@@ -185,13 +170,13 @@ protected:
     ///  specified in order, i.e. the number of face-vertices for each successive face.
     ///
 
-    /// \brief Specify the number of vertices to be accommodated
+    /// \brief Specify the number of vertices to be accomodated
     static void setNumBaseVertices(TopologyRefiner & newRefiner, int count);
 
-    /// \brief Specify the number of faces to be accommodated
+    /// \brief Specify the number of faces to be accomodated
     static void setNumBaseFaces(TopologyRefiner & newRefiner, int count);
 
-    /// \brief Specify the number of edges to be accommodated
+    /// \brief Specify the number of edges to be accomodated
     static void setNumBaseEdges(TopologyRefiner & newRefiner, int count);
 
     /// \brief Specify the number of vertices incident each face
@@ -275,10 +260,10 @@ protected:
     ///
     /// These methods are used to assign edge or vertex sharpness, for tagging faces
     /// as holes, etc.  Unlike topological assignment, only those components that
-    /// possess a feature of interest need be explicitly assigned.
+    /// posses a feature of interest need be explicitly assigned.
     ///
     /// Since topological construction is largely complete by this point, a method is
-    /// available to identify an edge for sharpness assignment given a pair of vertices.
+    /// availble to identify an edge for sharpness assignment given a pair of vertices.
     ///
 
     /// \brief Identify an edge to be assigned a sharpness value given a vertex pair
@@ -301,7 +286,7 @@ protected:
     /// topology is assigned -- indices for face-varying values are assigned to the
     /// corners of each face just as indices for vertices were assigned.
     ///
-    /// Independent sets of face-varying data are stored in channels.  The identifier
+    /// Independent sets of face-varying data is stored in channels.  The identifier
     /// of each channel (an integer) is expected whenever referring to face-varying
     /// data in any form.
     ///
@@ -322,19 +307,6 @@ protected:
     //  Not to be specialized:
     //
     static bool populateBaseLevel(TopologyRefiner& refiner, MESH const& mesh, Options options);
-
-private:
-    //
-    //  An oversight in the interfaces of the error reporting function between the factory
-    //  class and the Vtr::Level requires this adapter function to avoid warnings.
-    //
-    //  The static class method requires a reference as the MESH argument, but the interface
-    //  for Vtr::Level requires a pointer (void*). So this adapter with a MESH* argument is
-    //  used to effectively cast the function pointer required by Vtr::Level error reporting:
-    //
-    static void reportInvalidTopologyAdapter(TopologyError errCode, char const * msg, MESH const * mesh) {
-        reportInvalidTopology(errCode, msg, *mesh);
-    }
 };
 
 
@@ -347,7 +319,7 @@ TopologyRefinerFactory<MESH>::Create(MESH const& mesh, Options options) {
 
     TopologyRefiner * refiner = new TopologyRefiner(options.schemeType, options.schemeOptions);
 
-    if (! populateBaseLevel(*refiner, mesh, options)) {
+    if (not populateBaseLevel(*refiner, mesh, options)) {
         delete refiner;
         return 0;
     }
@@ -357,13 +329,6 @@ TopologyRefinerFactory<MESH>::Create(MESH const& mesh, Options options) {
     //  features (e.g. holes, etc.) it is better off deferred to here.
 
     return refiner;
-}
-
-template <class MESH>
-TopologyRefiner*
-TopologyRefinerFactory<MESH>::Create(TopologyRefiner const & source) {
-
-    return new TopologyRefiner(source);
 }
 
 template <class MESH>
@@ -384,8 +349,8 @@ TopologyRefinerFactory<MESH>::populateBaseLevel(TopologyRefiner& refiner, MESH c
     //  an inventory of all components and their relations that is used to allocate buffers
     //  to be efficiently populated in the subsequent topology assignment step.
     //
-    if (! resizeComponentTopology(refiner, mesh)) return false;
-    if (! prepareComponentTopologySizing(refiner)) return false;
+    if (not resizeComponentTopology(refiner, mesh)) return false;
+    if (not prepareComponentTopologySizing(refiner)) return false;
 
     //
     //  Assignment of the topology -- this is a required specialization for MESH.  If edges
@@ -393,24 +358,24 @@ TopologyRefinerFactory<MESH>::populateBaseLevel(TopologyRefiner& refiner, MESH c
     //  Otherwise edges and remaining topology will be completed from the face-vertices:
     //
     bool             validate = options.validateFullTopology;
-    TopologyCallback callback = reinterpret_cast<TopologyCallback>(reportInvalidTopologyAdapter);
+    TopologyCallback callback = reinterpret_cast<TopologyCallback>(reportInvalidTopology);
     void const *     userData = &mesh;
         
-    if (! assignComponentTopology(refiner, mesh)) return false;
-    if (! prepareComponentTopologyAssignment(refiner, validate, callback, userData)) return false;
+    if (not assignComponentTopology(refiner, mesh)) return false;
+    if (not prepareComponentTopologyAssignment(refiner, validate, callback, userData)) return false;
 
     //
     //  User assigned and internal tagging of components -- an optional specialization for
     //  MESH.  Allows the specification of sharpness values, holes, etc.
     //
-    if (! assignComponentTags(refiner, mesh)) return false;
-    if (! prepareComponentTagsAndSharpness(refiner)) return false;
+    if (not assignComponentTags(refiner, mesh)) return false;
+    if (not prepareComponentTagsAndSharpness(refiner)) return false;
 
     //
     //  Defining channels of face-varying primvar data -- an optional specialization for MESH.
     //
-    if (! assignFaceVaryingTopology(refiner, mesh)) return false;
-    if (! prepareFaceVaryingChannels(refiner)) return false;
+    if (not assignFaceVaryingTopology(refiner, mesh)) return false;
+    if (not prepareFaceVaryingChannels(refiner)) return false;
 
     return true;
 }
@@ -451,7 +416,6 @@ template <class MESH>
 inline void
 TopologyRefinerFactory<MESH>::setNumBaseFaceVertices(TopologyRefiner & newRefiner, Index f, int count) {
     newRefiner._levels[0]->resizeFaceVertices(f, count);
-    newRefiner._hasIrregFaces = newRefiner._hasIrregFaces || (count != newRefiner._regFaceSize);
 }
 template <class MESH>
 inline void
@@ -553,7 +517,7 @@ template <class MESH>
 inline void
 TopologyRefinerFactory<MESH>::setBaseFaceHole(TopologyRefiner & newRefiner, Index f, bool b) {
     newRefiner._levels[0]->setFaceHole(f, b);
-    newRefiner._hasHoles = newRefiner._hasHoles || b;
+    newRefiner._hasHoles |= b;
 }
 
 template <class MESH>
@@ -650,7 +614,7 @@ TopologyRefinerFactory<MESH>::assignComponentTopology(TopologyRefiner& /* refine
     //  or, if the mesh is manifold, explicit assignment of these can be deferred and
     //  all can be determined by calling:
     //
-    //      void populateBaseLocalIndices(TopologyRefiner& newRefiner)
+    //      void populateBaseLocalIndices(TopologyRefiner& newRefiner, )
     //
     //  All components are assumed to be locally manifold and ordering of components in
     //  the above relations is expected to be counter-clockwise.
@@ -664,7 +628,7 @@ TopologyRefinerFactory<MESH>::assignComponentTopology(TopologyRefiner& /* refine
     //      void setBaseVertexNonManifold(TopologyRefiner& newRefiner, Index vertex, bool b);
     //
     //  Also consider using TopologyLevel::ValidateTopology() when debugging to ensure
-    //  that topology has been completely and correctly specified.
+    //  that topolology has been completely and correctly specified.
     //
     return false;
 }

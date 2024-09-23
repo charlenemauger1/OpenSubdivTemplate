@@ -73,36 +73,9 @@ HSConstFunc(
 
     OSD_PATCH_CULL(20);
 
-#if defined OSD_ENABLE_SCREENSPACE_TESSELLATION
-    // Gather bezier control points to compute limit surface tess levels
-    OsdPerPatchVertexBezier bezcv[16];
-    bezcv[ 0].P = patch[ 0].position.xyz;
-    bezcv[ 1].P = patch[ 1].position.xyz;
-    bezcv[ 2].P = patch[ 7].position.xyz;
-    bezcv[ 3].P = patch[ 5].position.xyz;
-    bezcv[ 4].P = patch[ 2].position.xyz;
-    bezcv[ 5].P = patch[ 3].position.xyz;
-    bezcv[ 6].P = patch[ 8].position.xyz;
-    bezcv[ 7].P = patch[ 6].position.xyz;
-    bezcv[ 8].P = patch[16].position.xyz;
-    bezcv[ 9].P = patch[18].position.xyz;
-    bezcv[10].P = patch[13].position.xyz;
-    bezcv[11].P = patch[12].position.xyz;
-    bezcv[12].P = patch[15].position.xyz;
-    bezcv[13].P = patch[17].position.xyz;
-    bezcv[14].P = patch[11].position.xyz;
-    bezcv[15].P = patch[10].position.xyz;
-
-    OsdEvalPatchBezierTessLevels(
-                bezcv, patchParam,
-                tessLevelOuter, tessLevelInner,
-                tessOuterLo, tessOuterHi);
-#else
-    OsdGetTessLevelsUniform(
-                patchParam,
-                tessLevelOuter, tessLevelInner,
-                tessOuterLo, tessOuterHi);
-#endif
+    OsdGetTessLevels(patch[0].position.xyz, patch[15].position.xyz,
+                     patch[10].position.xyz, patch[5].position.xyz,
+                     patchParam, tessLevelOuter, tessLevelInner);
 
     output.tessLevelOuter[0] = tessLevelOuter[0];
     output.tessLevelOuter[1] = tessLevelOuter[1];
@@ -111,9 +84,6 @@ HSConstFunc(
 
     output.tessLevelInner[0] = tessLevelInner[0];
     output.tessLevelInner[1] = tessLevelInner[1];
-
-    output.tessOuterLo = tessOuterLo;
-    output.tessOuterHi = tessOuterHi;
 
     return output;
 }
@@ -126,7 +96,7 @@ HSConstFunc(
 void ds_main_patches(
     in HS_CONSTANT_FUNC_OUT input,
     in OutputPatch<OsdPerPatchVertexGregoryBasis, 20> patch,
-    in float2 domainCoord : SV_DomainLocation,
+    in float2 UV : SV_DomainLocation,
     out OutputVertex output )
 {
     float3 P = float3(0,0,0), dPu = float3(0,0,0), dPv = float3(0,0,0);
@@ -136,10 +106,6 @@ void ds_main_patches(
     for (int i = 0; i < 20; ++i) {
         cv[i] = patch[i].P;
     }
-
-    float2 UV = OsdGetTessParameterization(domainCoord,
-                                           input.tessOuterLo,
-                                           input.tessOuterHi);
 
     int3 patchParam = patch[0].patchParam;
     OsdEvalPatchGregory(patchParam, UV, cv, P, dPu, dPv, N, dNu, dNv);
@@ -152,9 +118,6 @@ void ds_main_patches(
 #ifdef OSD_COMPUTE_NORMAL_DERIVATIVES
     output.Nu = dNu;
     output.Nv = dNv;
-#endif
-#if defined OSD_PATCH_ENABLE_SINGLE_CREASE
-    output.vSegments = float2(0,0);
 #endif
 
     output.patchCoord = OsdInterpolatePatchCoord(UV, patchParam);

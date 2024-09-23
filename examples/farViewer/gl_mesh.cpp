@@ -22,8 +22,6 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
-
 #include "gl_mesh.h"
 #include "gl_fontutils.h"
 
@@ -89,7 +87,7 @@ getFaceTexture() {
 
 #include "face_texture.h"
 
-    if (! g_faceTexture) {
+    if (not g_faceTexture) {
         glGenTextures(1, &g_faceTexture);
         glBindTexture(GL_TEXTURE_2D, g_faceTexture);
 
@@ -744,13 +742,13 @@ GLMesh::InitializeDeviceBuffers() {
     // copy buffers to device
     for (int i=0; i<COMP_NUM_COMPONENTS; ++i) {
 
-        if (! _VAO[i]) {
+        if (not _VAO[i]) {
             glGenVertexArrays(1, &_VAO[i]);
         }
         glBindVertexArray(_VAO[i]);
 
-        if (! _vbo[i].empty()) {
-            if (! _VBO[i]) {
+        if (not _vbo[i].empty()) {
+            if (not _VBO[i]) {
                 glGenBuffers(1, &_VBO[i]);
             }
             glBindBuffer(GL_ARRAY_BUFFER, _VBO[i]);
@@ -770,9 +768,9 @@ GLMesh::InitializeDeviceBuffers() {
              }
         }
 
-        if (! _eao[i].empty()) {
+        if (not _eao[i].empty()) {
 
-            if (! _EAO[i]) {
+            if (not _EAO[i]) {
                 glGenBuffers(1, &_EAO[i]);
             }
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _EAO[i]);
@@ -782,7 +780,7 @@ GLMesh::InitializeDeviceBuffers() {
         GLUtils::CheckGLErrors("init");
     }
 
-    if (! _faceColors.empty()) {
+    if (not _faceColors.empty()) {
         _TBOfaceColors = createTextureBuffer(_faceColors, GL_RGBA32F);
     }
 
@@ -831,7 +829,7 @@ bindProgram( char const * shaderSource,
            lightingBinding=1;
 
     // Update and bind transform state
-    if (! *program) {
+    if (not *program) {
 
         *program = glCreateProgram();
 

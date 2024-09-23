@@ -35,14 +35,18 @@ SYNOPSIS
 .. parsed-literal:: 
    :class: codefhead
 
-   **dxPtexViewer** [**-f**] [**-yup**] [**-u**] [**-a**] [**-l** *isolation level*] [**-c** *animation loops*]
-       [**-e** *environment map*] [**-d** *HDR diffuse map*] [**-s** *HDR specular map*]
-       [**--disp** *displacement scale*]
-       *ptex color file*
-       *ptex displacement file*
-       *ptex occlusion file*
-       *ptex specular file*
-       *objfile(s)*
+   **dxPtexViewer** 
+   [**-e** *environment map*]
+   [**-d** *HDR diffuse map*]
+   [**-s** *HDR specular map*]
+   [**-y**]
+   [**--disp** *displacement scale*]
+   [**-l** *isolation level*] 
+   *ptex color file*
+   *ptex displacement file*
+   *ptex occlusion file*
+   *ptex specular file*
+   *objfile(s)*
 
 DESCRIPTION
 ===========
@@ -51,22 +55,11 @@ DESCRIPTION
 with color, displacement, occlusion and specular ptex maps. Multiple controls 
 are available to experiment with the algorithms.
 
-.. image:: images/dxptexviewer.png
-    :width: 400px
-    :align: center
-    :target: images/dxptexviewer.png
-
+.. include:: under_development.rst
 
 
 OPTIONS
 =======
-
-See the description of the
-`common comand line options <code_examples.html#common-command-line-options>`__
-for the subset of common options supported here.
-
-**-y**
-  Swap Z-up geometry to Y-UP.
 
 **-e** *environment map*
   A low dynamic range spherical environment map used as a background. Ideally,
@@ -81,6 +74,13 @@ for the subset of common options supported here.
 
 **--disp** *displacement scale*
   A scalar multiplier for the shader displacement values.
+
+**-y**
+  Swap Z-up geometry to Y-UP.
+
+**-l** *isolation level*
+  Select the desired isolation level of adaptive feature isolation. This can be 
+  useful when trying to load large pieces of geometry.
 
 *ptex color file*
   A ptex file containing RGB channels read as material albedo color.
@@ -102,7 +102,7 @@ for the subset of common options supported here.
   the data contained in all the ptex files !)
 
 
-KEYBOARD CONTROLS
+Keyboard Controls
 =================
 
    .. code:: c++

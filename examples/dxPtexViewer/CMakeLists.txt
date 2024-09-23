@@ -26,14 +26,12 @@
 
 set(SHADER_FILES
      shader.hlsl
-     skyshader.hlsl
 )
 
 set(PLATFORM_LIBRARIES
     "${OSD_LINK_TARGET}"
     "${DXSDK_LIBRARIES}"
     "${PTEX_LIBRARY}"
-    "${ZLIB_LIBRARY}"
 )
 
 include_directories(
@@ -46,22 +44,29 @@ if (OPENCL_FOUND)
     include_directories("${OPENCL_INCLUDE_DIRS}")
 endif()
 
+# XXX: This is unfortunate, we should probably refactor examples_common_obj
+# to separate out the GL from the DX dependencies so that we don't end up
+# in the situation where we have to link in GLFW for dxPtexViewer.
+if (GLFW_FOUND)
+    list(APPEND PLATFORM_LIBRARIES
+        "${GLFW_LIBRARIES}"
+    )
+endif()
+
 set(SOURCE_FILES
     dxPtexViewer.cpp
-    sky.cpp
 )
 
-osd_stringify("${SHADER_FILES}" INC_FILES)
+_stringify("${SHADER_FILES}" INC_FILES)
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
-osd_add_possibly_cuda_executable(dxPtexViewer "examples" WIN32
+_add_possibly_cuda_executable(dxPtexViewer WIN32
     "${SOURCE_FILES}"
     "${INC_FILES}"
     $<TARGET_OBJECTS:regression_common_obj>
     $<TARGET_OBJECTS:regression_far_utils_obj>
-    $<TARGET_OBJECTS:examples_common_dx11_obj>
-    $<TARGET_OBJECTS:examples_common_ptex_obj>
+    $<TARGET_OBJECTS:examples_common_obj>
 )
 
 target_link_libraries(dxPtexViewer

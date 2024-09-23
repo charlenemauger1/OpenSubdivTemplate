@@ -124,8 +124,8 @@ findExtensionSupportedDevice(cl_device_id *clDevices,
             std::string extString(extensions);
             delete[] extensions;
 
-            // parse string. This is a bit deficient since the extensions
-            // string is space separated.
+            // parse string. This is bit deficient since the extentions
+            // is space separated.
             //
             // The actual string would be "cl_khr_d3d11_sharing"
             //                         or "cl_nv_d3d11_sharing"
@@ -158,10 +158,10 @@ CLDeviceContext::HAS_CL_VERSION_1_1 () {
 #ifdef OPENSUBDIV_HAS_CLEW
     static bool clewInitialized = false;
     static bool clewLoadSuccess;
-    if (!clewInitialized) {
+    if (not clewInitialized) {
         clewInitialized = true;
         clewLoadSuccess = clewInit() == CLEW_SUCCESS;
-        if (!clewLoadSuccess) {
+        if (not clewLoadSuccess) {
             error("Loading OpenCL failed.\n");
         }
     }

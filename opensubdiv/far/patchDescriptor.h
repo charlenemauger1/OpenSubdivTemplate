@@ -41,6 +41,18 @@ namespace Far {
 ///
 /// Uniquely identifies all the different types of patches
 ///
+/// * Uniformly subdivided meshes contain bilinear patches of either QUADS
+///   or TRIANGLES
+///
+/// * Adaptively subdivided meshes contain bicubic patches of types REGULAR,
+///   GREGORY, GREGORY_BOUNDARY, GREGORY_BASIS.
+///
+/// Bitfield layout :
+///
+///  Field       | Bits | Content
+///  ------------|:----:|------------------------------------------------------
+///  _type       | 4    | patch type
+///
 class PatchDescriptor {
 
 public:
@@ -51,16 +63,15 @@ public:
         POINTS,            ///< points (useful for cage drawing)
         LINES,             ///< lines  (useful for cage drawing)
 
-        QUADS,             ///< 4-sided quadrilateral (bilinear)
-        TRIANGLES,         ///< 3-sided triangle
+        QUADS,             ///< bilinear quads-only patches
+        TRIANGLES,         ///< bilinear triangles-only mesh
 
-        LOOP,              ///< regular triangular patch for the Loop scheme
+        LOOP,              ///< Loop patch
 
-        REGULAR,           ///< regular B-Spline patch for the Catmark scheme
+        REGULAR,           ///< feature-adaptive bicubic patches
         GREGORY,
         GREGORY_BOUNDARY,
-        GREGORY_BASIS,
-        GREGORY_TRIANGLE
+        GREGORY_BASIS
     };
 
 public:
@@ -77,20 +88,14 @@ public:
     PatchDescriptor( PatchDescriptor const & d ) :
         _type(d.GetType()) { }
 
-    /// \brief Assignment operator
-    PatchDescriptor & operator=( PatchDescriptor const & d ) {
-        _type = d.GetType();
-        return *this;
-    }
-
     /// \brief Returns the type of the patch
     Type GetType() const {
         return (Type)_type;
     }
 
-    /// \brief Returns true if the type is an adaptive (non-linear) patch
+    /// \brief Returns true if the type is an adaptive patch
     static inline bool IsAdaptive(Type type) {
-        return type > TRIANGLES;
+        return (type>=LOOP and type<=GREGORY_BASIS);
     }
 
     /// \brief Returns true if the type is an adaptive patch
@@ -102,7 +107,6 @@ public:
     /// type described
     static inline short GetNumControlVertices( Type t );
 
-    /// \brief Deprecated @see PatchDescriptor#GetNumControlVertices
     static inline short GetNumFVarControlVertices( Type t );
 
     /// \brief Returns the number of control vertices expected for a patch of the
@@ -111,7 +115,8 @@ public:
         return GetNumControlVertices( this->GetType() );
     }
 
-    /// \brief Deprecated @see PatchDescriptor#GetNumControlVertices
+    /// \brief Returns the number of control vertices expected for a patch of the
+    /// type described
     short GetNumFVarControlVertices() const {
         return GetNumFVarControlVertices( this->GetType() );
     }
@@ -140,7 +145,7 @@ public:
     void print() const;
 
 private:
-    unsigned int _type;
+    unsigned int  _type:4;
 };
 
 typedef Vtr::ConstArray<PatchDescriptor> ConstPatchDescriptorArray;
@@ -150,12 +155,10 @@ inline short
 PatchDescriptor::GetNumControlVertices( Type type ) {
     switch (type) {
         case REGULAR           : return GetRegularPatchSize();
-        case LOOP              : return 12;
         case QUADS             : return 4;
         case GREGORY           :
         case GREGORY_BOUNDARY  : return GetGregoryPatchSize();
         case GREGORY_BASIS     : return GetGregoryBasisPatchSize();
-        case GREGORY_TRIANGLE  : return 18;
         case TRIANGLES         : return 3;
         case LINES             : return 2;
         case POINTS            : return 1;
@@ -166,7 +169,17 @@ PatchDescriptor::GetNumControlVertices( Type type ) {
 // Returns the number of face-varying control vertices expected for a patch of this type
 inline short
 PatchDescriptor::GetNumFVarControlVertices( Type type ) {
-    return PatchDescriptor::GetNumControlVertices(type);
+    switch (type) {
+        case REGULAR           : return GetRegularPatchSize();
+        case QUADS             : return 4;
+        case TRIANGLES         : return 3;
+        case LINES             : return 2;
+        case POINTS            : return 1;
+        case GREGORY_BASIS     : assert(0); return GetGregoryBasisPatchSize();
+        case GREGORY           :
+        case GREGORY_BOUNDARY  : assert(0); // unsupported types
+        default : return -1;
+    }
 }
 
 // Allows ordering of patches by type

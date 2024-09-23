@@ -35,7 +35,7 @@ SYNOPSIS
 .. parsed-literal:: 
    :class: codefhead
 
-   **glShareTopology** [**-u**] [**-a**] [**-l** *refinement level*]
+   **glShareTopology** [**-d** *isolation level*] *objfile(s)*
 
 DESCRIPTION
 ===========
@@ -51,8 +51,8 @@ instancing across Compute contexts. Multiple controls are available to experimen
 OPTIONS
 =======
 
-See the description of the
-`common comand line options <code_examples.html#common-command-line-options>`__
-for the subset of common options supported here.
+**-d** *isolation level*
+  Select the desired isolation level of adaptive feature isolation. This can be 
+  useful when trying to load large pieces of geometry.
 
 .. include:: examples_see_also.rst

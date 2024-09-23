@@ -22,7 +22,23 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
+#if defined(__APPLE__)
+    #if defined(OSD_USES_GLEW)
+        #include <GL/glew.h>
+    #else
+        #include <OpenGL/gl3.h>
+    #endif
+    #define GLFW_INCLUDE_GL3
+    #define GLFW_NO_GLU
+#else
+    #include <stdlib.h>
+    #include <GL/glew.h>
+    #if defined(_WIN32)
+        // XXX Must include windows.h here or GLFW pollutes the global namespace
+        #define WIN32_LEAN_AND_MEAN
+        #include <windows.h>
+    #endif
+#endif
 
 #include <GLFW/glfw3.h>
 GLFWwindow* g_window=0;
@@ -30,10 +46,10 @@ GLFWwindow* g_window=0;
 #include <stdio.h>
 #include <cassert>
 
-#include <opensubdiv/osd/cpuEvaluator.h>
-#include <opensubdiv/osd/cpuVertexBuffer.h>
-#include <opensubdiv/osd/cpuGLVertexBuffer.h>
-#include <opensubdiv/far/stencilTableFactory.h>
+#include <osd/cpuEvaluator.h>
+#include <osd/cpuVertexBuffer.h>
+#include <osd/cpuGLVertexBuffer.h>
+#include <far/stencilTableFactory.h>
 
 #include "../common/cmp_utils.h"
 #include "../common/hbr_utils.h"
@@ -172,7 +188,7 @@ checkVertexBuffer(
         // boundary interpolation rules set to "none" produce "undefined" 
         // vertices on boundary vertices : far does not match hbr for those,
         // so skip comparison.
-        if (hbrVertexOnBoundaryPtr && (*hbrVertexOnBoundaryPtr)[i])
+        if (hbrVertexOnBoundaryPtr and (*hbrVertexOnBoundaryPtr)[i])
              continue;
 
         const float *hbrPos = hbrVertexData[i].GetPos();
@@ -570,25 +586,25 @@ static void
 parseArgs(int argc, char ** argv) {
 
     for (int argi=1; argi<argc; ++argi) {
-        if (! strcmp(argv[argi],"-compute")) {
+        if (not strcmp(argv[argi],"-compute")) {
         
             const char * backend = NULL;
             
             if (argi<(argc-1))
                 backend = argv[++argi];
 
-            if (! strcmp(backend, "all")) {
+            if (not strcmp(backend, "all")) {
               g_Backend = -1;
             } else {
               bool found = false;
               for (int i = 0; i < kBackendCount; ++i) {
-                if (! strcmp(backend, g_BackendNames[i])) {
+                if (not strcmp(backend, g_BackendNames[i])) {
                   g_Backend = i;
                   found = true;
                   break;
                 }
               }
-              if (! found) {
+              if (not found) {
                 printf("-compute : must be 'all' or one of: ");
                 for (int i = 0; i < kBackendCount; ++i)
                     printf("%s ", g_BackendNames[i]);
@@ -596,8 +612,8 @@ parseArgs(int argc, char ** argv) {
                 exit(0);
               }
             }
-        } else if ( (! strcmp(argv[argi],"-help")) ||
-                    (! strcmp(argv[argi],"-h")) ) {
+        } else if ( (not strcmp(argv[argi],"-help")) or
+                    (not strcmp(argv[argi],"-h")) ) {
             usage(argv);
             exit(1);
         } else {
@@ -605,12 +621,6 @@ parseArgs(int argc, char ** argv) {
             exit(0);
         }
     }
-}
-
-void _glfw_error_callback(int error, const char *description)
-{
-    printf("GLFW reported error %d: %s\n",
-            error, description);
 }
 
 //------------------------------------------------------------------------------
@@ -622,11 +632,8 @@ main(int argc, char ** argv) {
     // "-backend <name>" tests one backend.
     parseArgs(argc, argv);
 
-    glfwSetErrorCallback(_glfw_error_callback);
-
     // Make sure we have an OpenGL context : create dummy GLFW window
-    if (! glfwInit()) {
-        printf("DISPLAY set to '%s'\n", getenv("DISPLAY"));
+    if (not glfwInit()) {
         printf("Failed to initialize GLFW\n");
         return 1;
     }
@@ -634,14 +641,19 @@ main(int argc, char ** argv) {
     int width=10, height=10;
     
     static const char windowTitle[] = "OpenSubdiv OSD regression";
-    if (! (g_window=glfwCreateWindow(width, height, windowTitle, NULL, NULL))) {
+    if (not (g_window=glfwCreateWindow(width, height, windowTitle, NULL, NULL))) {
         printf("Failed to open window.\n");
         glfwTerminate();
         return 1;
     }
     glfwMakeContextCurrent(g_window);
     
-    OpenSubdiv::internal::GLLoader::applicationInitializeGL();
+#if defined(OSD_USES_GLEW)
+    if (GLenum r = glewInit() != GLEW_OK) {
+        printf("Failed to initialize glew. error = %d\n", r);
+        exit(1);
+    }
+#endif
 
     printf("precision : %f\n",PRECISION);
 

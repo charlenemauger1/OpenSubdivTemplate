@@ -22,7 +22,7 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
+#include "../common/glUtils.h"
 
 #include <iostream>
 #include <fstream>
@@ -30,55 +30,53 @@
 #include <limits>
 #include <GLFW/glfw3.h>
 
-#include <opensubdiv/osd/cpuEvaluator.h>
-#include <opensubdiv/osd/cpuGLVertexBuffer.h>
+#include <osd/cpuEvaluator.h>
+#include <osd/cpuGLVertexBuffer.h>
 
 #ifdef OPENSUBDIV_HAS_OPENMP
-    #include <opensubdiv/osd/ompEvaluator.h>
+    #include <osd/ompEvaluator.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_TBB
-    #include <opensubdiv/osd/tbbEvaluator.h>
+    #include <osd/tbbEvaluator.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_OPENCL
-    #include <opensubdiv/osd/clEvaluator.h>
-    #include <opensubdiv/osd/clGLVertexBuffer.h>
+    #include <osd/clEvaluator.h>
+    #include <osd/clGLVertexBuffer.h>
 
     #include "../common/clDeviceContext.h"
     CLDeviceContext g_clDeviceContext;
 #endif
 
 #ifdef OPENSUBDIV_HAS_CUDA
-    #include <opensubdiv/osd/cudaEvaluator.h>
-    #include <opensubdiv/osd/cudaGLVertexBuffer.h>
+    #include <osd/cudaEvaluator.h>
+    #include <osd/cudaGLVertexBuffer.h>
     #include "../common/cudaDeviceContext.h"
     CudaDeviceContext g_cudaDeviceContext;
 #endif
 
 #ifdef OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK
-    #include <opensubdiv/osd/glXFBEvaluator.h>
-    #include <opensubdiv/osd/glVertexBuffer.h>
+    #include <osd/glXFBEvaluator.h>
+    #include <osd/glVertexBuffer.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_GLSL_COMPUTE
-    #include <opensubdiv/osd/glComputeEvaluator.h>
-    #include <opensubdiv/osd/glVertexBuffer.h>
+    #include <osd/glComputeEvaluator.h>
+    #include <osd/glVertexBuffer.h>
 #endif
 
-#include <opensubdiv/osd/glMesh.h>
+#include <osd/glMesh.h>
 
 #include "../../regression/common/far_utils.h"
-#include "../../regression/common/arg_utils.h"
 #include "../common/patchColors.h"
 #include "../common/stb_image_write.h"    // common.obj has an implementation.
 #include "../common/glShaderCache.h"
-#include "../common/glUtils.h"
 #include "init_shapes.h"
 
 using namespace OpenSubdiv;
 
-#include <opensubdiv/osd/glslPatchShaderSource.h>
+#include <osd/glslPatchShaderSource.h>
 static const char *shaderSource =
 #include "shader.gen.h"
 ;
@@ -92,8 +90,12 @@ public:
         using namespace OpenSubdiv;
 
         // compile shader program
-        GLDrawConfig *config =
-            new GLDrawConfig(GLUtils::GetShaderVersionInclude().c_str());
+#if defined(GL_ARB_tessellation_shader) || defined(GL_VERSION_4_0)
+        const char *glslVersion = "#version 400\n";
+#else
+        const char *glslVersion = "#version 330\n";
+#endif
+        GLDrawConfig *config = new GLDrawConfig(glslVersion);
 
         Far::PatchDescriptor::Type type = desc.GetType();
 
@@ -106,19 +108,6 @@ public:
             ss << "#define PRIM_TRI\n";
         }
 
-        // need for patch color-coding : we need these defines in the fragment shader
-        if (type == Far::PatchDescriptor::GREGORY) {
-            ss << "#define OSD_PATCH_GREGORY\n";
-        } else if (type == Far::PatchDescriptor::GREGORY_BOUNDARY) {
-            ss << "#define OSD_PATCH_GREGORY_BOUNDARY\n";
-        } else if (type == Far::PatchDescriptor::GREGORY_BASIS) {
-            ss << "#define OSD_PATCH_GREGORY_BASIS\n";
-        } else if (type == Far::PatchDescriptor::LOOP) {
-            ss << "#define OSD_PATCH_LOOP\n";
-        } else if (type == Far::PatchDescriptor::GREGORY_TRIANGLE) {
-            ss << "#define OSD_PATCH_GREGORY_TRIANGLE\n";
-        }
-        
         if (desc.IsAdaptive()) {
             ss << "#define SMOOTH_NORMALS\n";
         }
@@ -126,9 +115,7 @@ public:
         ss << "#define OSD_ENABLE_PATCH_CULL\n";
         ss << "#define GEOMETRY_OUT_LINE\n";
 
-        if (desc.IsAdaptive() && type == Far::PatchDescriptor::REGULAR) {
-            ss << "#define OSD_PATCH_ENABLE_SINGLE_CREASE\n";
-        }
+        ss << "#define OSD_PATCH_ENABLE_SINGLE_CREASE\n";
 
         // include osd PatchCommon
         ss << Osd::GLSLPatchShaderSource::GetCommonShaderSource();
@@ -297,7 +284,8 @@ void runTest(ShapeDesc const &shapeDesc, std::string const &kernel,
 
     std::cout << "Testing " << shapeDesc.name << ", kernel = " << kernel << "\n";
 
-    Shape const * shape = Shape::parseObj(shapeDesc);
+    Shape const * shape = Shape::parseObj(shapeDesc.data.c_str(),
+                                          shapeDesc.scheme);
 
     // create Far mesh (topology)
     Sdc::SchemeType sdctype = GetSdcType(*shape);
@@ -309,11 +297,13 @@ void runTest(ShapeDesc const &shapeDesc, std::string const &kernel,
             *shape,
             Far::TopologyRefinerFactory<Shape>::Options(sdctype, sdcoptions));
 
+    // Adaptive refinement currently supported only for catmull-clark scheme
+    bool doAdaptive = adaptive && (shapeDesc.scheme == kCatmark);
     bool interleaveVarying = true;
     bool doSingleCreasePatch = true;
 
     Osd::MeshBitset bits;
-    bits.set(Osd::MeshAdaptive, adaptive);
+    bits.set(Osd::MeshAdaptive, doAdaptive);
     bits.set(Osd::MeshUseSingleCreasePatch, doSingleCreasePatch);
     bits.set(Osd::MeshInterleaveVarying, interleaveVarying);
     bits.set(Osd::MeshFVarData, false);
@@ -456,9 +446,8 @@ void runTest(ShapeDesc const &shapeDesc, std::string const &kernel,
 
 static void usage(const char *program) {
     std::cout
-        << "Usage: " << program << "\n"
-        << "   -a                      : adaptive refinement (default)\n"
-        << "   -u                      : uniform refinement\n"
+        << "Usage %s : " << program << "\n"
+        << "   -a                      : adaptive refinement\n"
         << "   -l <isolation level>    : isolation level (default = 2)\n"
         << "   -t <tess level>         : tessellation level (default = 1)\n"
         << "   -w <prefix>             : write images to PNG as\n"
@@ -477,64 +466,37 @@ int main(int argc, char ** argv) {
     int tessLevel = 1;
     int isolationLevel = 2;
     bool writeToFile = false;
-    bool adaptive = true;
+    bool adaptive = false;
     std::string prefix;
     std::string displayMode = "PATCH_TYPE";
     std::vector<std::string> kernels;
 
-    ArgOptions args;
-
-    args.Parse(argc, argv);
-
-    adaptive = args.GetAdaptive();
-    isolationLevel = args.GetLevel();
-
-    // Parse remaining args
-    const std::vector<const char *> &argvRem = args.GetRemainingArgs();
-    for (size_t i = 0; i < argvRem.size(); ++i) {
-        if (!strcmp(argvRem[i], "-k")) {
-            std::stringstream ss(argvRem[++i]);
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "-a")) {
+            adaptive = true;
+        } else if (!strcmp(argv[i], "-l")) {
+            isolationLevel = atoi(argv[++i]);
+        } else if (!strcmp(argv[i], "-k")) {
+            std::stringstream ss(argv[++i]);
             std::string kernel;
             while(std::getline(ss, kernel, ',')) {
                 kernels.push_back(kernel);
             }
-        } else if (!strcmp(argvRem[i], "-t")) {
-            tessLevel = atoi(argvRem[++i]);
-        } else if (!strcmp(argvRem[i], "-w")) {
+        } else if (!strcmp(argv[i], "-t")) {
+            tessLevel = atoi(argv[++i]);
+        } else if (!strcmp(argv[i], "-w")) {
             writeToFile = true;
-            prefix = argvRem[++i];
-        } else if (!strcmp(argvRem[i], "-s")) {
-            width = atoi(argvRem[++i]);
-            height = atoi(argvRem[++i]);
-        } else if (!strcmp(argvRem[i], "-d")) {
-            displayMode = argvRem[++i];
+            prefix = argv[++i];
+        } else if (!strcmp(argv[i], "-s")) {
+            width = atoi(argv[++i]);
+            height = atoi(argv[++i]);
+        } else if (!strcmp(argv[i], "-d")) {
+            displayMode = argv[++i];
         } else {
-            args.PrintUnrecognizedArgWarning(argvRem[i]);
             usage(argv[0]);
             return 1;
         }
     }
-
-    if (! glfwInit()) {
-        std::cout << "Failed to initialize GLFW\n";
-        return 1;
-    }
-
-    static const char windowTitle[] =
-        "OpenSubdiv imaging test " OPENSUBDIV_VERSION_STRING;
-
-    GLUtils::SetMinimumGLVersion();
-
-    GLFWwindow *window = glfwCreateWindow(width, height, windowTitle, NULL, NULL);
-    if (! window) {
-        std::cerr << "Failed to create OpenGL context.\n";
-        glfwTerminate();
-    }
-
-    glfwMakeContextCurrent(window);
-
-    GLUtils::InitializeGL();
-    GLUtils::PrintGLVersion();
 
     // by default, test all available kernels
     if (kernels.empty()) {
@@ -552,16 +514,43 @@ int main(int argc, char ** argv) {
         kernels.push_back("CL");
 #endif
 #ifdef OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK
-    if (OSD_OPENGL_HAS(VERSION_4_1)) {
         kernels.push_back("XFB");
-    }
 #endif
 #ifdef OPENSUBDIV_HAS_GLSL_COMPUTE
-    if (OSD_OPENGL_HAS(VERSION_4_3)) {
         kernels.push_back("GLSL");
-    }
 #endif
     }
+
+    if (not glfwInit()) {
+        std::cout << "Failed to initialize GLFW\n";
+        return 1;
+    }
+
+    static const char windowTitle[] =
+        "OpenSubdiv imaging test " OPENSUBDIV_VERSION_STRING;
+
+    GLUtils::SetMinimumGLVersion();
+
+    GLFWwindow *window = glfwCreateWindow(width, height, windowTitle, NULL, NULL);
+    if (not window) {
+        std::cerr << "Failed to create OpenGL context.\n";
+        glfwTerminate();
+    }
+
+    glfwMakeContextCurrent(window);
+    GLUtils::PrintGLVersion();
+
+#if defined(OSD_USES_GLEW)
+    // this is the only way to initialize glew correctly under core profile context.
+    glewExperimental = true;
+    if (GLenum r = glewInit() != GLEW_OK) {
+        std::cout << "Failed to initialize glew. Error = "
+                  << glewGetErrorString(r) << "\n";
+        exit(1);
+    }
+    // clear GL errors generated during glewInit()
+    glGetError();
+#endif
 
     initShapes();
 
@@ -644,12 +633,12 @@ int main(int argc, char ** argv) {
         }
         ofs << "</tr>\n";
 
-        for (size_t i = 0; i < g_defaultShapes.size(); ++i) {
+        for (size_t i = 0; i < g_shapes.size(); ++i) {
             ofs << "<tr>\n";
-            ofs << "<td>" << g_defaultShapes[i].name << "</td>\n";
+            ofs << "<td>" << g_shapes[i].name << "</td>\n";
             for (size_t k = 0; k < kernels.size(); ++k) {
                 ofs << "<td>";
-                ofs << "<img src='" << prefix << "_" << kernels[k] << "_" << g_defaultShapes[i].name << ".png'>";
+                ofs << "<img src='" << prefix << "_" << kernels[k] << "_" << g_shapes[i].name << ".png'>";
                 ofs << "</td>";
             }
             ofs << "</tr>\n";
@@ -684,9 +673,9 @@ int main(int argc, char ** argv) {
             }
         }
 #endif
-        for (size_t i = 0; i < g_defaultShapes.size(); ++i) {
+        for (size_t i = 0; i < g_shapes.size(); ++i) {
             // run test
-            runTest(g_defaultShapes[i], kernel, isolationLevel, adaptive, &shaderCache);
+            runTest(g_shapes[i], kernel, isolationLevel, adaptive, &shaderCache);
 
             if (writeToFile) {
                 // read back pixels
@@ -694,7 +683,7 @@ int main(int argc, char ** argv) {
                 glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, &data[0]);
 
                 // write image
-                std::string filename = prefix + "_" + kernel + "_" + g_defaultShapes[i].name + ".png";
+                std::string filename = prefix + "_" + kernel + "_" + g_shapes[i].name + ".png";
                 // flip vertical
                 stbi_write_png(filename.c_str(), width, height, 3, &data[width*3*(height-1)], -width*3);
             }

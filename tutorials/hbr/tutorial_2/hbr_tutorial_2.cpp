@@ -27,7 +27,7 @@
 // Tutorial description:
 //
 // This tutorial shows how to subdivide uniformly a simple Hbr mesh. We are
-// building upon previous tutorials and assuming a fully instantiated mesh:
+// building upon previous turtorials and assuming a fully instantiated mesh:
 // we start with an HbrMesh pointer initialized from the same pyramid shape
 // used in hbr_tutorial_0.
 //
@@ -45,7 +45,7 @@
 
 //------------------------------------------------------------------------------
 //
-// For this tutorial, we have to flesh out the Vertex class further. Note that now
+// For this tutorial, we have to flesh the Vertex class further. Note that now
 // the copy constructor, Clear() and AddwithWeight() methods have been
 // implemented to interpolate our float3 position data.
 //
@@ -113,7 +113,7 @@ int main(int, char **) {
 
         // Total number of faces in the mesh, across all levels
         //
-        // Note: this function iterates over the list of faces and can be slow
+        // Mote: this function iterates over the list of faces and can be slow
         int nfaces = hmesh->GetNumFaces();
 
         if (level==(maxlevel-1)) {
@@ -126,7 +126,7 @@ int main(int, char **) {
 
             Hface * f = hmesh->GetFace(face);
 
-            // Note: hole tags would have to be dealt with here.
+            // Mote : hole tags would have to be dealt with here.
             f->Refine();
         }
 
@@ -215,7 +215,7 @@ createMesh() {
             Hhalfedge const * opposite = destination->GetEdge(origin);
 
             // Make sure that the vertices exist in the mesh
-            if (origin==NULL || destination==NULL) {
+            if (origin==NULL or destination==NULL) {
                 printf(" An edge was specified that connected a nonexistent vertex\n");
                 valid=false;
                 break;
@@ -229,7 +229,7 @@ createMesh() {
             }
 
             // Check that no more than 2 faces are adjacent to the edge
-            if (opposite && opposite->GetOpposite() ) {
+            if (opposite and opposite->GetOpposite() ) {
                 printf(" A non-manifold edge incident to more than 2 faces was found\n");
                 valid=false;
                 break;

@@ -63,22 +63,7 @@ void writeVertex(Vertex v) {
 
 //------------------------------------------------------------------------------
 
-#if defined(OPENSUBDIV_GLSL_XFB_USE_1ST_DERIVATIVES) && \
-    defined(OPENSUBDIV_GLSL_XFB_INTERLEAVED_1ST_DERIVATIVE_BUFFERS)
-out float outDeriv1Buffer[2*LENGTH];
-
-void writeDu(Vertex v) {
-    for(int i = 0; i < LENGTH; i++) {
-        outDeriv1Buffer[i] = v.vertexData[i];
-    }
-}
-
-void writeDv(Vertex v) {
-    for(int i = 0; i < LENGTH; i++) {
-        outDeriv1Buffer[i+LENGTH] = v.vertexData[i];
-    }
-}
-#elif defined(OPENSUBDIV_GLSL_XFB_USE_1ST_DERIVATIVES)
+#if defined(OPENSUBDIV_GLSL_XFB_USE_DERIVATIVES)
 out float outDuBuffer[LENGTH];
 out float outDvBuffer[LENGTH];
 
@@ -95,51 +80,6 @@ void writeDv(Vertex v) {
 }
 #endif
 
-#if defined(OPENSUBDIV_GLSL_XFB_USE_2ND_DERIVATIVES) && \
-    defined(OPENSUBDIV_GLSL_XFB_INTERLEAVED_2ND_DERIVATIVE_BUFFERS)
-out float outDeriv2Buffer[3*LENGTH];
-
-void writeDuu(Vertex v) {
-    for(int i = 0; i < LENGTH; i++) {
-        outDeriv2Buffer[i] = v.vertexData[i];
-    }
-}
-
-void writeDuv(Vertex v) {
-    for(int i = 0; i < LENGTH; i++) {
-        outDeriv2Buffer[i+LENGTH] = v.vertexData[i];
-    }
-}
-
-void writeDvv(Vertex v) {
-    for(int i = 0; i < LENGTH; i++) {
-        outDeriv2Buffer[i+2*LENGTH] = v.vertexData[i];
-    }
-}
-#elif defined(OPENSUBDIV_GLSL_XFB_USE_2ND_DERIVATIVES)
-out float outDuuBuffer[LENGTH];
-out float outDuvBuffer[LENGTH];
-out float outDvvBuffer[LENGTH];
-
-void writeDuu(Vertex v) {
-    for(int i = 0; i < LENGTH; i++) {
-        outDuuBuffer[i] = v.vertexData[i];
-    }
-}
-
-void writeDuv(Vertex v) {
-    for(int i = 0; i < LENGTH; i++) {
-        outDuvBuffer[i] = v.vertexData[i];
-    }
-}
-
-void writeDvv(Vertex v) {
-    for(int i = 0; i < LENGTH; i++) {
-        outDvvBuffer[i] = v.vertexData[i];
-    }
-}
-#endif
-
 //------------------------------------------------------------------------------
 
 #if defined(OPENSUBDIV_GLSL_XFB_KERNEL_EVAL_STENCILS)
@@ -149,15 +89,9 @@ uniform isamplerBuffer offsets;
 uniform isamplerBuffer indices;
 uniform samplerBuffer  weights;
 
-#if defined(OPENSUBDIV_GLSL_XFB_USE_1ST_DERIVATIVES)
+#if defined(OPENSUBDIV_GLSL_XFB_USE_DERIVATIVES)
 uniform samplerBuffer  duWeights;
 uniform samplerBuffer  dvWeights;
-#endif
-
-#if defined(OPENSUBDIV_GLSL_XFB_USE_2ND_DERIVATIVES)
-uniform samplerBuffer  duuWeights;
-uniform samplerBuffer  duvWeights;
-uniform samplerBuffer  dvvWeights;
 #endif
 
 uniform int batchStart = 0;
@@ -170,13 +104,10 @@ void main() {
         return;
     }
 
-    Vertex dst, du, dv, duu, duv, dvv;
+    Vertex dst, du, dv;
     clear(dst);
     clear(du);
     clear(dv);
-    clear(duu);
-    clear(duv);
-    clear(dvv);
 
     int offset = texelFetch(offsets, current).x;
     uint size = texelFetch(sizes, current).x;
@@ -186,31 +117,18 @@ void main() {
         float weight = texelFetch(weights, offset+stencil).x;
         addWithWeight(dst, readVertex( index ), weight);
 
-#if defined(OPENSUBDIV_GLSL_XFB_USE_1ST_DERIVATIVES)
+#if defined(OPENSUBDIV_GLSL_XFB_USE_DERIVATIVES)
         float duWeight = texelFetch(duWeights, offset+stencil).x;
         float dvWeight = texelFetch(dvWeights, offset+stencil).x;
         addWithWeight(du,  readVertex(index), duWeight);
         addWithWeight(dv,  readVertex(index), dvWeight);
 #endif
-#if defined(OPENSUBDIV_GLSL_XFB_USE_2ND_DERIVATIVES)
-        float duuWeight = texelFetch(duuWeights, offset+stencil).x;
-        float duvWeight = texelFetch(duvWeights, offset+stencil).x;
-        float dvvWeight = texelFetch(dvvWeights, offset+stencil).x;
-        addWithWeight(duu,  readVertex(index), duuWeight);
-        addWithWeight(duv,  readVertex(index), duvWeight);
-        addWithWeight(dvv,  readVertex(index), dvvWeight);
-#endif
     }
     writeVertex(dst);
 
-#if defined(OPENSUBDIV_GLSL_XFB_USE_1ST_DERIVATIVES)
+#if defined(OPENSUBDIV_GLSL_XFB_USE_DERIVATIVES)
     writeDu(du);
     writeDv(dv);
-#endif
-#if defined(OPENSUBDIV_GLSL_XFB_USE_2ND_DERIVATIVES)
-    writeDuu(duu);
-    writeDuv(duv);
-    writeDvv(dvv);
 #endif
 }
 
@@ -223,71 +141,146 @@ void main() {
 layout (location = 0) in ivec3 patchHandles;
 layout (location = 1) in vec2  patchCoords;
 
-layout (std140) uniform PatchArrays {
-    OsdPatchArray patchArrays[2];
-};
+//struct PatchArray {
+//    int patchType;
+//    int numPatches;
+//    int indexBase;        // an offset within the index buffer
+//    int primitiveIdBase;  // an offset within the patch param buffer
+//};
+// # of patcharrays is 1 or 2.
+
+uniform ivec4 patchArray[2];
 uniform isamplerBuffer patchParamBuffer;
 uniform isamplerBuffer patchIndexBuffer;
 
-OsdPatchArray GetPatchArray(int arrayIndex) {
-    return patchArrays[arrayIndex];
+void getBSplineWeights(float t, inout vec4 point, inout vec4 deriv) {
+    // The four uniform cubic B-Spline basis functions evaluated at t:
+    float one6th = 1.0f / 6.0f;
+
+    float t2 = t * t;
+    float t3 = t * t2;
+
+    point.x = one6th * (1.0f - 3.0f*(t -      t2) -      t3);
+    point.y = one6th * (4.0f           - 6.0f*t2  + 3.0f*t3);
+    point.z = one6th * (1.0f + 3.0f*(t +      t2  -      t3));
+    point.w = one6th * (                                 t3);
+
+    // Derivatives of the above four basis functions at t:
+    deriv.x = -0.5f*t2 +      t - 0.5f;
+    deriv.y =  1.5f*t2 - 2.0f*t;
+    deriv.z = -1.5f*t2 +      t + 0.5f;
+    deriv.w =  0.5f*t2;
 }
 
-OsdPatchParam GetPatchParam(int patchIndex) {
-    ivec3 patchParamBits = texelFetch(patchParamBuffer, patchIndex).xyz;
-    return OsdPatchParamInit(patchParamBits.x, patchParamBits.y, patchParamBits.z);
+uint getDepth(uint patchBits) {
+    return (patchBits & 0xfU);
+}
+
+float getParamFraction(uint patchBits) {
+    uint nonQuadRoot = (patchBits >> 4) & 0x1U;
+    uint depth = getDepth(patchBits);
+    if (nonQuadRoot == 1) {
+        return 1.0f / float( 1 << (depth-1) );
+    } else {
+        return 1.0f / float( 1 << depth );
+    }
+}
+
+vec2 normalizePatchCoord(uint patchBits, vec2 uv) {
+    float frac = getParamFraction(patchBits);
+
+    uint iu = (patchBits >> 22) & 0x3ffU;
+    uint iv = (patchBits >> 12) & 0x3ffU;
+
+    // top left corner
+    float pu = float(iu*frac);
+    float pv = float(iv*frac);
+
+    // normalize u,v coordinates
+    return vec2((uv.x - pu) / frac, (uv.y - pv) / frac);
+}
+
+void adjustBoundaryWeights(uint bits, inout vec4 sWeights, inout vec4 tWeights) {
+    uint boundary = ((bits >> 8) & 0xfU);
+
+    if ((boundary & 1U) != 0) {
+        tWeights[2] -= tWeights[0];
+        tWeights[1] += 2*tWeights[0];
+        tWeights[0] = 0;
+    }
+    if ((boundary & 2U) != 0) {
+        sWeights[1] -= sWeights[3];
+        sWeights[2] += 2*sWeights[3];
+        sWeights[3] = 0;
+    }
+    if ((boundary & 4U) != 0) {
+        tWeights[1] -= tWeights[3];
+        tWeights[2] += 2*tWeights[3];
+        tWeights[3] = 0;
+    }
+    if ((boundary & 8U) != 0) {
+        sWeights[2] -= sWeights[0];
+        sWeights[1] += 2*sWeights[0];
+        sWeights[0] = 0;
+    }
 }
 
 void main() {
     int current = gl_VertexID;
 
     ivec3 handle = patchHandles;
-    int arrayIndex = handle.x;
     int patchIndex = handle.y;
 
     vec2 coord = patchCoords;
+    ivec4 array = patchArray[handle.x];
+    int patchType = array.x;
+    int numControlVertices = 16;
 
-    OsdPatchArray array = GetPatchArray(arrayIndex);
-    OsdPatchParam param = GetPatchParam(patchIndex);
+    uint patchBits = texelFetch(patchParamBuffer, patchIndex).y;
 
-    int patchType = OsdPatchParamIsRegular(param) ? array.regDesc : array.desc;
+    // normalize
+    coord = normalizePatchCoord(patchBits, coord);
+    float dScale = float(1 << getDepth(patchBits));
 
-    float wP[20], wDu[20], wDv[20], wDuu[20], wDuv[20], wDvv[20];
-    int nPoints = OsdEvaluatePatchBasis(patchType, param,
-        coord.x, coord.y, wP, wDu, wDv, wDuu, wDuv, wDvv);
+    // if regular
+    float wP[20], wDs[20], wDt[20];
+    {
+        vec4 sWeights, tWeights, dsWeights, dtWeights;
+        getBSplineWeights(coord.s, sWeights, dsWeights);
+        getBSplineWeights(coord.t, tWeights, dtWeights);
 
-    Vertex dst, du, dv, duu, duv, dvv;
+        adjustBoundaryWeights(patchBits, sWeights, tWeights);
+        adjustBoundaryWeights(patchBits, dsWeights, dtWeights);
+
+        for (int k = 0; k < 4; ++k) {
+            for (int l = 0; l < 4; ++l) {
+                wP[4*k+l]  = sWeights[l]  * tWeights[k];
+                wDs[4*k+l] = dsWeights[l] * tWeights[k]  * dScale;
+                wDt[4*k+l] = sWeights[l]  * dtWeights[k] * dScale;
+            }
+        }
+    }
+
+    Vertex dst, du, dv;
     clear(dst);
     clear(du);
     clear(dv);
-    clear(duu);
-    clear(duv);
-    clear(dvv);
 
-    int indexBase = array.indexBase + array.stride *
-                (patchIndex - array.primitiveIdBase);
-
-    for (int cv = 0; cv < nPoints; ++cv) {
+    int indexBase = array.z + handle.z;
+    for (int cv = 0; cv < numControlVertices; ++cv) {
         int index = texelFetch(patchIndexBuffer, indexBase + cv).x;
         addWithWeight(dst, readVertex(index), wP[cv]);
-        addWithWeight(du,  readVertex(index), wDu[cv]);
-        addWithWeight(dv,  readVertex(index), wDv[cv]);
-        addWithWeight(duu, readVertex(index), wDuu[cv]);
-        addWithWeight(duv, readVertex(index), wDuv[cv]);
-        addWithWeight(dvv, readVertex(index), wDvv[cv]);
+        addWithWeight(du,  readVertex(index), wDs[cv]);
+        addWithWeight(dv,  readVertex(index), wDt[cv]);
     }
 
     writeVertex(dst);
 
-#if defined(OPENSUBDIV_GLSL_XFB_USE_1ST_DERIVATIVES)
+#if defined(OPENSUBDIV_GLSL_XFB_USE_DERIVATIVES)
     writeDu(du);
     writeDv(dv);
 #endif
-#if defined(OPENSUBDIV_GLSL_XFB_USE_2ND_DERIVATIVES)
-    writeDuu(duu);
-    writeDuv(duv);
-    writeDvv(dvv);
-#endif
+
 }
 
 #endif

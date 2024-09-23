@@ -374,11 +374,11 @@ getAdaptivePatchColor(int3 patchParam, float2 vSegments)
         float4(0.0f,  0.8f,  0.75f, 1.0f),   // boundary pattern 4
 
         float4(0.0f,  1.0f,  0.0f,  1.0f),   // corner
-        float4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 0
-        float4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 1
-        float4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 2
-        float4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 3
-        float4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 4
+        float4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 0
+        float4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 1
+        float4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 2
+        float4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 3
+        float4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 4
 
         float4(1.0f,  1.0f,  0.0f,  1.0f),   // gregory
         float4(1.0f,  1.0f,  0.0f,  1.0f),   // gregory
@@ -403,47 +403,34 @@ getAdaptivePatchColor(int3 patchParam, float2 vSegments)
     };
 
     int patchType = 0;
-
+    int pattern = countbits(OsdGetPatchTransitionMask(patchParam));
     int edgeCount = countbits(OsdGetPatchBoundaryMask(patchParam));
     if (edgeCount == 1) {
         patchType = 2; // BOUNDARY
     }
-    if (edgeCount > 1) {
-        patchType = 3; // CORNER (not correct for patches that are not isolated)
+    if (edgeCount == 2) {
+        patchType = 3; // CORNER
     }
 
 #if defined OSD_PATCH_ENABLE_SINGLE_CREASE
     if (vSegments.y > 0) {
         patchType = 1;
     }
-#elif defined OSD_PATCH_GREGORY
+#endif
+
+    // XXX: it looks like edgeCount != 0 for gregory_boundary.
+    //      there might be a bug somewhere.
+#if defined OSD_PATCH_GREGORY
     patchType = 4;
 #elif defined OSD_PATCH_GREGORY_BOUNDARY
     patchType = 5;
 #elif defined OSD_PATCH_GREGORY_BASIS
     patchType = 6;
-#elif defined OSD_PATCH_GREGORY_TRIANGLE
-    patchType = 6;
 #endif
 
-    int pattern = countbits(OsdGetPatchTransitionMask(patchParam));
 
     return patchColors[6*patchType + pattern];
 }
-
-float4
-getAdaptiveDepthColor(int3 patchParam)
-{
-    //  Represent depth with repeating cycle of four colors:
-    const float4 depthColors[4] = {
-        float4(0.0f,  0.5f,  0.5f,  1.0f),
-        float4(1.0f,  1.0f,  1.0f,  1.0f),
-        float4(0.0f,  1.0f,  1.0f,  1.0f),
-        float4(0.5f,  1.0f,  0.5f,  1.0f)
-    };
-    return depthColors[OsdGetPatchRefinementLevel(patchParam) & 3];
-}
-
 
 // ---------------------------------------------------------------------------
 //  Pixel Shader
@@ -464,9 +451,6 @@ ps_main( in OutputVertex input,
 #if defined(SHADING_PATCH_TYPE)
     float4 color = getAdaptivePatchColor(
         OsdGetPatchParam(OsdGetPatchIndex(primitiveID)), vSegments);
-#elif defined(SHADING_PATCH_DEPTH)
-    float4 color = getAdaptiveDepthColor(
-        OsdGetPatchParam(OsdGetPatchIndex(primitiveID)));
 #elif defined(SHADING_PATCH_COORD)
     float4 color = float4(input.patchCoord.x, input.patchCoord.y, 0, 1);
 #elif defined(SHADING_MATERIAL)

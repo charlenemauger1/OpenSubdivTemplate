@@ -66,31 +66,31 @@ static clEnqueueReleaseD3D11Objects_fn clEnqueueReleaseD3D11Objects = NULL;
 
 static void resolveInteropFunctions() {
 
-    if (! clCreateFromD3D11Buffer) {
+    if (not clCreateFromD3D11Buffer) {
         clCreateFromD3D11Buffer =
             (clCreateFromD3D11Buffer_fn)
             clGetExtensionFunctionAddress("clCreateFromD3D11BufferKHR");
     }
-    if (! clCreateFromD3D11Buffer) {
+    if (not clCreateFromD3D11Buffer) {
         clCreateFromD3D11Buffer =
             (clCreateFromD3D11Buffer_fn)
             clGetExtensionFunctionAddress("clCreateFromD3D11BufferNV");
     }
 
-    if (! clEnqueueAcquireD3D11Objects) {
+    if (not clEnqueueAcquireD3D11Objects) {
         clEnqueueAcquireD3D11Objects = (clEnqueueAcquireD3D11Objects_fn)
             clGetExtensionFunctionAddress("clEnqueueAcquireD3D11ObjectsKHR");
     }
-    if (! clEnqueueAcquireD3D11Objects) {
+    if (not clEnqueueAcquireD3D11Objects) {
         clEnqueueAcquireD3D11Objects = (clEnqueueAcquireD3D11Objects_fn)
             clGetExtensionFunctionAddress("clEnqueueAcquireD3D11ObjectsNV");
     }
 
-    if (! clEnqueueReleaseD3D11Objects) {
+    if (not clEnqueueReleaseD3D11Objects) {
         clEnqueueReleaseD3D11Objects = (clEnqueueReleaseD3D11Objects_fn)
             clGetExtensionFunctionAddress("clEnqueueReleaseD3D11ObjectsKHR");
     }
-    if (! clEnqueueReleaseD3D11Objects) {
+    if (not clEnqueueReleaseD3D11Objects) {
         clEnqueueReleaseD3D11Objects = (clEnqueueReleaseD3D11Objects_fn)
             clGetExtensionFunctionAddress("clEnqueueReleaseD3D11ObjectsNV");
     }
@@ -178,9 +178,9 @@ CLD3D11VertexBuffer::allocate(cl_context clContext, ID3D11Device *device) {
         return false;
     }
 
-    if (! clCreateFromD3D11Buffer) {
+    if (not clCreateFromD3D11Buffer) {
         resolveInteropFunctions();
-        if (! clCreateFromD3D11Buffer) {
+        if (not clCreateFromD3D11Buffer) {
             return false;
         }
     }
@@ -200,9 +200,9 @@ CLD3D11VertexBuffer::map(cl_command_queue queue) {
     if (_clMapped) return;
     _clQueue = queue;
 
-    if (! clEnqueueAcquireD3D11Objects) {
+    if (not clEnqueueAcquireD3D11Objects) {
         resolveInteropFunctions();
-        if (! clEnqueueAcquireD3D11Objects) {
+        if (not clEnqueueAcquireD3D11Objects) {
             return;
         }
     }
@@ -214,10 +214,10 @@ CLD3D11VertexBuffer::map(cl_command_queue queue) {
 void
 CLD3D11VertexBuffer::unmap() {
 
-    if (! _clMapped) return;
-    if (! clEnqueueReleaseD3D11Objects) {
+    if (not _clMapped) return;
+    if (not clEnqueueReleaseD3D11Objects) {
         resolveInteropFunctions();
-        if (! clEnqueueReleaseD3D11Objects) {
+        if (not clEnqueueReleaseD3D11Objects) {
             return;
         }
     }

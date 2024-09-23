@@ -67,15 +67,10 @@ if (NOT NO_LIB)
             ${PUBLIC_HEADER_FILES}
     )
 
-    set_target_properties(vtr_obj
-        PROPERTIES
-            FOLDER "opensubdiv"
-    )
-
 endif()
 
 #-------------------------------------------------------------------------------
-osd_add_doxy_headers( "${DOXY_HEADER_FILES}" )
+_add_doxy_headers( "${DOXY_HEADER_FILES}" )
 
 install(
     FILES

@@ -42,7 +42,7 @@ namespace Sdc {
 ///  limit surface, including the "shape" of primitive variable data associated with
 ///  it.
 ///
-///  The intent is that these sets of options be defined at a high level and
+///  The intent is that these sets of options be defined at a high-level and
 ///  propagated into the lowest-level computation in support of each subdivision
 ///  scheme.  Ideally it remains a set of bit-fields (essentially an int) and so
 ///  remains light weight and easily passed around by value.
@@ -51,11 +51,9 @@ namespace Sdc {
 class Options {
 public:
     enum VtxBoundaryInterpolation {
-        VTX_BOUNDARY_NONE = 0,        ///< no boundary interpolation, except where
-                                      ///< boundary edges were explicitly sharpened
-        VTX_BOUNDARY_EDGE_ONLY,       ///< all boundary edges sharpened and interpolated
-        VTX_BOUNDARY_EDGE_AND_CORNER  ///< all boundary edges and corner vertices
-                                      ///< sharpened and interpolated
+        VTX_BOUNDARY_NONE = 0,        ///< do not interpolate boundaries
+        VTX_BOUNDARY_EDGE_ONLY,       ///< sharpen edges
+        VTX_BOUNDARY_EDGE_AND_CORNER  ///< sharpen edges and corners
     };
     enum FVarLinearInterpolation {
         FVAR_LINEAR_NONE = 0,         ///< smooth everywhere ("edge only")
@@ -85,38 +83,37 @@ public:
     //  Trivial get/set methods:
     //
 
-    /// \brief Get vertex boundary interpolation rule
+    /// \brief Set vertex boundary interpolation rule
     VtxBoundaryInterpolation GetVtxBoundaryInterpolation() const { return (VtxBoundaryInterpolation) _vtxBoundInterp; }
 
-    /// \brief Set vertex boundary interpolation rule
-    void SetVtxBoundaryInterpolation(VtxBoundaryInterpolation b) { _vtxBoundInterp = (EnumIntType) b; }
+    /// \brief Get vertex boundary interpolation rule
+    void SetVtxBoundaryInterpolation(VtxBoundaryInterpolation b) { _vtxBoundInterp = b; }
 
     /// \brief Get face-varying interpolation rule
     FVarLinearInterpolation GetFVarLinearInterpolation() const { return (FVarLinearInterpolation) _fvarLinInterp; }
 
     /// \brief Set face-varying interpolation rule
-    void SetFVarLinearInterpolation(FVarLinearInterpolation b) { _fvarLinInterp = (EnumIntType) b; }
+    void SetFVarLinearInterpolation(FVarLinearInterpolation b) { _fvarLinInterp = b; }
 
     /// \brief Get edge crease rule
     CreasingMethod GetCreasingMethod() const { return (CreasingMethod) _creasingMethod; }
 
     /// \brief Set edge crease rule
-    void SetCreasingMethod(CreasingMethod c) { _creasingMethod = (EnumIntType) c; }
+    void SetCreasingMethod(CreasingMethod c) { _creasingMethod = c; }
 
-    /// \brief Get triangle subdivision weights rule (Catmark scheme only !)
+    /// \brief Get triangle subdivsion weights rule (Catmark scheme only !)
     TriangleSubdivision GetTriangleSubdivision() const { return (TriangleSubdivision) _triangleSub; }
 
-    /// \brief Set triangle subdivision weights rule (Catmark scheme only !)
-    void SetTriangleSubdivision(TriangleSubdivision t) { _triangleSub = (EnumIntType) t; }
+    /// \brief Set triangle subdivsion weights rule (Catmark scheme only !)
+    void SetTriangleSubdivision(TriangleSubdivision t) { _triangleSub = t; }
 
 private:
-    //  Use a small integer type to pack these rather than bitfields:
-    typedef unsigned char EnumIntType;
 
-    EnumIntType _vtxBoundInterp;
-    EnumIntType _fvarLinInterp;
-    EnumIntType _creasingMethod;
-    EnumIntType _triangleSub;
+    //  Bitfield members:
+    unsigned int _vtxBoundInterp  : 2,
+                 _fvarLinInterp   : 3,
+                 _creasingMethod  : 2,
+                 _triangleSub     : 2;
 };
 
 } // end namespace sdc

@@ -25,7 +25,7 @@
 #ifndef CMP_UTILS_H
 #define CMP_UTILS_H
 
-#include <opensubdiv/far/topologyRefinerFactory.h>
+#include <far/topologyRefinerFactory.h>
 
 #include "hbr_utils.h"
 
@@ -41,7 +41,7 @@ namespace {
 };
 
 
-// Copies vertex data from hbrMesh into hbrVertexData reordered to match
+// Copies vertex data from hmesh into hbrVertexData reordered to match
 // the given refiner and subdivision level.  This is used for later easy 
 // comparison between the two.
 template<class T>
@@ -95,7 +95,7 @@ GetReorderedHbrVertexData(
                                   * v1 = hmesh.GetVertex(farVerts[1]);
 
                     Hhalfedge * e = v0->GetEdge(v1);
-                    if (! e) {
+                    if (not e) {
                         e = v1->GetEdge(v0);
                     }
                     assert(e);
@@ -164,10 +164,10 @@ GetReorderedHbrVertexData(
 
                     Hvertex const * v0 = current.verts[farVerts[0]],
                                   * v1 = current.verts[farVerts[1]];
-                    assert(v0 && v1);
+                    assert(v0 and v1);
 
                     Hhalfedge * e= v0->GetEdge(v1);
-                    if (! e) {
+                    if (not e) {
                         e = v1->GetEdge(v0);
                     }
                     assert(e);

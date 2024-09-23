@@ -78,15 +78,22 @@ HSConstFunc(
     OSD_PATCH_CULL(16);
 
 #if defined OSD_ENABLE_SCREENSPACE_TESSELLATION
-    // Gather bezier control points to compute limit surface tess levels
+#if 0
+    // XXX: this doesn't work on nvidia driver 34x.
+    OsdGetTessLevelsAdaptiveLimitPoints(bezierPatch, patchParam,
+                     tessLevelOuter, tessLevelInner,
+                     tessOuterLo, tessOuterHi);
+#else
+    // This is needed to coerce correct behavior on nvidia driver 34x
     OsdPerPatchVertexBezier cpBezier[16];
     for (int i=0; i<16; ++i) {
         cpBezier[i] = bezierPatch[i];
         cpBezier[i].P += 0.0f;
     }
-    OsdEvalPatchBezierTessLevels(cpBezier, patchParam,
+    OsdGetTessLevelsAdaptiveLimitPoints(cpBezier, patchParam,
                      tessLevelOuter, tessLevelInner,
                      tessOuterLo, tessOuterHi);
+#endif
 #else
     OsdGetTessLevelsUniform(patchParam, tessLevelOuter, tessLevelInner,
                      tessOuterLo, tessOuterHi);

@@ -35,8 +35,12 @@ SYNOPSIS
 .. parsed-literal:: 
    :class: codefhead
 
-   **glViewer** [**-f**] [**-yup**] [**-u**] [**-a**] [**-l** *refinement level*] [**-c** *animation loops*]
-       *objfile(s)* [**-anim**] [**-catmark**] [**-loop**] [**-bilinear**]
+   **glViewer**
+   [**-d** *isolation level*]
+   [**-c** *animation loops*]
+   [**-f**]
+   [**-axis**]
+   *objfile(s)*
 
 DESCRIPTION
 ===========
@@ -53,8 +57,22 @@ shapes. Multiple controls are available to experiment with the algorithms.
 OPTIONS
 =======
 
-See the description of the
-`common comand line options <code_examples.html#common-command-line-options>`__
-for the subset of common options supported here.
+**-d** *isolation level*
+  Select the desired isolation level of adaptive feature isolation. This can be 
+  useful when trying to load large pieces of geometry.
+
+**-c** *animation frequency*
+  Number of repetitions of the animation loop (default=0 is infinite)
+
+**-f**
+  Launches the application in full-screen mode (if is supported by GLFW on the
+  OS)
+
+**-axis**
+  Swap Y-up / Z-up axis when loading obj files
+
+*objfile(s)*
+  A sequence of obj files used as an animation loop (the topology has to match
+  the data contained in all the ptex files !)
 
 .. include:: examples_see_also.rst

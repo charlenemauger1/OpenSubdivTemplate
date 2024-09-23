@@ -24,6 +24,7 @@
 
 #include "ptexMipmapTextureLoader.h"
 
+#include <Ptexture.h>
 #include <vector>
 #include <list>
 #include <algorithm>
@@ -43,7 +44,7 @@ PtexMipmapTextureLoader::Block::guttering(PtexMipmapTextureLoader *loader,
     unsigned char * lineBuffer = new unsigned char[lineBufferSize];
 
     for (int edge = 0; edge < 4; edge++) {
-        int len = (edge == 0 || edge == 2) ? wid : hei;
+        int len = (edge == 0 or edge == 2) ? wid : hei;
         loader->sampleNeighbor(lineBuffer, this->index, edge, len, bpp);
 
         unsigned char *s = lineBuffer, *d;
@@ -110,7 +111,7 @@ PtexMipmapTextureLoader::Block::guttering(PtexMipmapTextureLoader *loader,
                         (everything else, including boundary)
                     Since guttering pixels are placed on the border of each
                     ptex faces, it's not possible to store more than 4 pixels
-                    at a corner for a reasonable interpolation.
+                    at a coner for a reasonable interpolation.
                     In this case, we need to average all corner pixels and
                     overwrite with an averaged value, so that every face
                     vertex picks the same value.
@@ -172,11 +173,11 @@ PtexMipmapTextureLoader::Block::Generate(PtexMipmapTextureLoader *loader,
     // instead of nothing.
     limit = std::min(std::min(limit, ulog2_), vlog2_);
 
-    while (ulog2_ >= limit && vlog2_ >= limit
-           && (maxLevels == -1 || level <= maxLevels)) {
+    while (ulog2_ >= limit and vlog2_ >= limit
+           and (maxLevels == -1 or level <= maxLevels)) {
         if (level % 2 == 1)
             uofs += (1<<(ulog2_+1))+2;
-        if ((level > 0) && (level % 2 == 0))
+        if ((level > 0) and (level % 2 == 0))
             vofs += (1<<(vlog2_+1)) + 2;
 
         unsigned char *dst = destination + vofs * stride + uofs * bpp;
@@ -228,7 +229,7 @@ struct PtexMipmapTextureLoader::Page
 
         // returns true if a block can fit in this slot
         bool Fits(const Block *block) {
-            return (block->width <= width) && (block->height <= height);
+            return (block->width <= width) and (block->height <= height);
         }
     };
 
@@ -374,8 +375,8 @@ public:
                 _currentFace = _ptex->getFaceInfo(_currentFace).adjface(2);
                 _currentEdge = 1;
                 _mid = false;
-            } else if (info.isSubface() &&
-                (! _ptex->getFaceInfo(_currentFace).isSubface()) &&
+            } else if (info.isSubface() and
+                (not _ptex->getFaceInfo(_currentFace).isSubface()) and
                 _currentEdge == 3) {
                 _mid = true;
                 _currentEdge = info.adjedge(_currentEdge);
@@ -404,8 +405,8 @@ public:
             }
         }
         Ptex::FaceInfo nextFaceInfo = _ptex->getFaceInfo(_currentFace);
-        if ((! _clockWise) &&
-            (! info.isSubface()) && (nextFaceInfo.isSubface())) {
+        if ((not _clockWise) and
+            (not info.isSubface()) and (nextFaceInfo.isSubface())) {
              // needs tricky traverse for boundary subface...
              if (_currentEdge == 3) {
                  _currentFace = nextFaceInfo.adjface(2);
@@ -446,13 +447,12 @@ PtexMipmapTextureLoader::PtexMipmapTextureLoader(PtexTexture *ptex,
                                                        int maxNumPages,
                                                        int maxLevels,
                                                        size_t targetMemory,
-                                                       bool seamlessMipmap,
-                                                       bool padAlpha) :
+                                                       bool seamlessMipmap) :
     _ptex(ptex), _maxLevels(maxLevels), _bpp(0),
-    _pageWidth(0), _pageHeight(0),
-    _texelBuffer(NULL), _layoutBuffer(NULL), _memoryUsage(0)
+    _pageWidth(0), _pageHeight(0), _texelBuffer(NULL), _layoutBuffer(NULL),
+    _memoryUsage(0)
 {
-    // bytes per pixel
+    // byte per pixel
     _bpp = ptex->numChannels() * Ptex::DataSize(ptex->dataType());
 
     int numFaces = ptex->numFaces();
@@ -474,10 +474,6 @@ PtexMipmapTextureLoader::PtexMipmapTextureLoader(PtexTexture *ptex,
 
     optimizePacking(maxNumPages, targetMemory);
     generateBuffers();
-    
-    if (padAlpha) {
-        addAlphaChannel();
-    }
 }
 
 PtexMipmapTextureLoader::~PtexMipmapTextureLoader()
@@ -487,48 +483,6 @@ PtexMipmapTextureLoader::~PtexMipmapTextureLoader()
     }
     delete _texelBuffer;
     delete _layoutBuffer;
-}
-
-// add alpha channel to texelbuffer :
-//   assumes the texel buffer has been generated and apply a raw copy
-//   into a larger buffer with an alpha channel padded in
-// note : this is not a particularly elegant solution...
-void
-PtexMipmapTextureLoader::addAlphaChannel() {
-
-    assert(_ptex);
-
-    // allocate new larger texel buffer
-    int bpc = Ptex::DataSize(_ptex->dataType()),
-        srcStride = _ptex->numChannels() * bpc,
-        dstStride = srcStride + bpc;
-
-    size_t numTexels = _pageWidth * _pageHeight * _pages.size(),
-           memoryUsed = dstStride * numTexels;
-
-    unsigned char * texBuffer = new unsigned char[memoryUsed];
-
-    // loop over every texel & copy + pad
-    unsigned char const * src = _texelBuffer;
-    unsigned char * dest = texBuffer;
-
-    for (int i=0; i<(int)numTexels; ++i, src+=srcStride, dest+=dstStride) {
-        memcpy(dest, src, srcStride);
-
-        /// set alpha to 1
-        switch (_ptex->dataType()) {
-            case Ptex::dt_uint8  : *(uint8_t *)(dest+srcStride)= 0xFF; break;
-            case Ptex::dt_uint16 : *(uint16_t *)(dest+srcStride) = 0xFFFF; break;
-            case Ptex::dt_half   : *(uint16_t *)(dest+srcStride) = 0x3C00; break;
-            case Ptex::dt_float  : *(float *)(dest+srcStride) = 1.0f; break;
-        }
-    }
-
-    // remove old buffer & adjust class members
-    delete [] _texelBuffer;
-    _texelBuffer = texBuffer;
-    _memoryUsage = memoryUsed;
-    _bpp = dstStride;
 }
 
 // resample border texels for guttering
@@ -726,7 +680,7 @@ PtexMipmapTextureLoader::getCornerPixel(float *resultPixel, int numchannels,
           +------+-------+
         */
         int adjface = fi.adjface(edge);
-        if (adjface != -1 && !_ptex->getFaceInfo(adjface).isSubface()) {
+        if (adjface != -1 and !_ptex->getFaceInfo(adjface).isSubface()) {
             int adjedge = fi.adjedge(edge);
 
             Ptex::Res res(std::min((int)_blocks[adjface].ulog2, reslog2+1),
@@ -768,7 +722,7 @@ PtexMipmapTextureLoader::getCornerPixel(float *resultPixel, int numchannels,
                    but the edge 0 is an adjacent edge to get D pixel.
         */
         int adjface = fi.adjface(0);
-        if (adjface != -1 && !_ptex->getFaceInfo(adjface).isSubface()) {
+        if (adjface != -1 and !_ptex->getFaceInfo(adjface).isSubface()) {
             int adjedge = fi.adjedge(0);
             Ptex::Res res(std::min((int)_blocks[adjface].ulog2, reslog2+1),
                           std::min((int)_blocks[adjface].vlog2, reslog2+1));
@@ -802,7 +756,7 @@ PtexMipmapTextureLoader::getCornerPixel(float *resultPixel, int numchannels,
     // iterate faces around the vertex
     int numFaces = 0;
     CornerIterator it(_ptex, face, edge, reslog2);
-    for (; !it.IsDone(); it.Next(), ++numFaces) {
+    for (; not it.IsDone(); it.Next(), ++numFaces) {
         it.GetPixel(pixel);
 
         // accumulate pixel value
@@ -815,7 +769,7 @@ PtexMipmapTextureLoader::getCornerPixel(float *resultPixel, int numchannels,
         }
     }
     // if regular corner, returns diagonal pixel without averaging
-    if (numFaces == 4 && (! it.IsBoundary())) {
+    if (numFaces == 4 and (not it.IsBoundary())) {
         return true;
     }
 
@@ -839,7 +793,7 @@ PtexMipmapTextureLoader::getLevelDiff(int face, int edge)
 
     int maxDiff = 0;
     CornerIterator it(_ptex, face, edge, baseRes);
-    for (; !it.IsDone(); it.Next()) {
+    for (; not it.IsDone(); it.Next()) {
         int res = _blocks[it.GetCurrentFace()].ulog2;
         if (it.IsSubface()) ++res;
         maxDiff = std::max(maxDiff, baseRes - res);
@@ -866,12 +820,12 @@ PtexMipmapTextureLoader::optimizePacking(int maxNumPages,
     blocks.sort(Block::sort);
 
     // try to fit into the target memory size if specified
-    if (targetMemory != 0 && _bpp * numTexels > targetMemory) {
+    if (targetMemory != 0 and _bpp * numTexels > targetMemory) {
         size_t numTargetTexels = targetMemory / _bpp;
         while (numTexels > numTargetTexels) {
             Block *block = blocks.front();
 
-            if (block->ulog2 < 2 || block->vlog2 < 2) break;
+            if (block->ulog2 < 2 or block->vlog2 < 2) break;
 
             // pick a smaller mipmap
             numTexels -= block->GetNumTexels();
@@ -898,7 +852,7 @@ PtexMipmapTextureLoader::optimizePacking(int maxNumPages,
             h = std::max(h, (int)(*it)->height);
         }
 
-        // grow the page size to make sure the optimization will not exceed
+        // grow the pagesize to make sure the optimization will not exceed
         // the maximum number of pages allowed
         int minPageSize = 512;
         int maxPageSize = 4096;  // XXX:should be configurable.
@@ -946,7 +900,7 @@ PtexMipmapTextureLoader::optimizePacking(int maxNumPages,
         }
 
         // adjust the page flag to the first page with open slots
-        if (_pages.size() > (firstslot+1) &&
+        if (_pages.size() > (firstslot+1) and
             _pages[firstslot+1]->IsFull()) ++firstslot;
     }
 

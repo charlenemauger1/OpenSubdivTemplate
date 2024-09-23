@@ -38,11 +38,9 @@ namespace OpenSubdiv {
 namespace OPENSUBDIV_VERSION {
 
 namespace Vtr { namespace internal { class SparseSelector; } }
-namespace Far { namespace internal { class FeatureMask; } }
 
 namespace Far {
 
-template <typename REAL> class PrimvarRefinerReal;
 template <class MESH> class TopologyRefinerFactory;
 
 ///
@@ -64,7 +62,7 @@ public:
     /// \brief Returns the subdivision options
     Sdc::Options GetSchemeOptions() const { return _subdivOptions; }
 
-    /// \brief Returns true if uniform refinement has been applied
+    /// \brief Returns true if uniform subdivision has been applied
     bool IsUniform() const   { return _isUniform; }
 
     /// \brief Returns the number of refinement levels
@@ -76,7 +74,7 @@ public:
     /// \brief Returns the maximum vertex valence in all levels
     int  GetMaxValence() const { return _maxValence; }
 
-    /// \brief Returns true if faces have been tagged as holes
+    /// \ brief Returns true if faces have been tagged as holes
     bool HasHoles() const { return _hasHoles; }
 
     /// \brief Returns the total number of vertices in all levels
@@ -103,27 +101,12 @@ public:
     //
 
     /// \brief Uniform refinement options
-    ///
-    /// Options for uniform refinement, including the number of levels, vertex
-    /// ordering and generation of topology information.
-    ///
-    /// Note the impact of the option to generate fullTopologyInLastLevel.  Given
-    /// subsequent levels of uniform refinement typically reguire 4x the data
-    /// of the previous level, only the minimum amount of data is generated in the
-    /// last level by default, i.e. a vertex and face-vertex list.  If requiring
-    /// topology traversal of the last level, e.g. inspecting edges or incident
-    /// faces of vertices, the option to generate full topology in the last
-    /// level should be enabled.
-    ///
     struct UniformOptions {
 
         UniformOptions(int level) :
-            refinementLevel(level & 0xf),
+            refinementLevel(level),
             orderVerticesFromFacesFirst(false),
             fullTopologyInLastLevel(false) { }
-
-        /// \brief Set uniform refinement level
-        void SetRefinementLevel(int level) { refinementLevel = level & 0xf; }
 
         unsigned int refinementLevel:4,             ///< Number of refinement iterations
                      orderVerticesFromFacesFirst:1, ///< Order child vertices from faces first
@@ -134,12 +117,6 @@ public:
     };
 
     /// \brief Refine the topology uniformly
-    ///
-    /// This method applies uniform refinement to the level specified in the
-    /// given UniformOptions.
-    ///
-    /// Note the impact of the UniformOption to generate fullTopologyInLastLevel
-    /// and be sure it is assigned to satisfy the needs of the resulting refinement.
     ///
     /// @param options   Options controlling uniform refinement
     ///
@@ -156,46 +133,28 @@ public:
     struct AdaptiveOptions {
 
         AdaptiveOptions(int level) :
-            isolationLevel(level & 0xf),
-            secondaryLevel(0xf),
+            isolationLevel(level),
             useSingleCreasePatch(false),
-            useInfSharpPatch(false),
-            considerFVarChannels(false),
             orderVerticesFromFacesFirst(false) { }
 
-        /// \brief Set isolation level
-        void SetIsolationLevel(int level) { isolationLevel = level & 0xf; }
-
-        /// \brief Set secondary isolation level
-        void SetSecondaryLevel(int level) { secondaryLevel = level & 0xf; }
-
-        unsigned int isolationLevel:4;              ///< Number of iterations applied to isolate
+        unsigned int isolationLevel:4,              ///< Number of iterations applied to isolate
                                                     ///< extraordinary vertices and creases
-        unsigned int secondaryLevel:4;              ///< Shallower level to stop isolation of
-                                                    ///< smooth irregular features
-        unsigned int useSingleCreasePatch:1;        ///< Use 'single-crease' patch and stop
+                     useSingleCreasePatch:1,        ///< Use 'single-crease' patch and stop
                                                     ///< isolation where applicable
-        unsigned int useInfSharpPatch:1;            ///< Use infinitely sharp patches and stop
-                                                    ///< isolation where applicable
-        unsigned int considerFVarChannels:1;        ///< Inspect face-varying channels and
-                                                    ///< isolate when irregular features present
-        unsigned int orderVerticesFromFacesFirst:1; ///< Order child vertices from faces first
+                     orderVerticesFromFacesFirst:1; ///< Order child vertices from faces first
                                                     ///< instead of child vertices of vertices
     };
 
-    /// \brief Feature Adaptive topology refinement
+    /// \brief Feature Adaptive topology refinement (restricted to scheme Catmark)
     ///
-    /// @param options         Options controlling adaptive refinement
+    /// @param options   Options controlling adaptive refinement
     ///
-    /// @param selectedFaces   Limit adaptive refinement to the specified faces
-    ///
-    void RefineAdaptive(AdaptiveOptions options,
-                        ConstIndexArray selectedFaces = ConstIndexArray());
+    void RefineAdaptive(AdaptiveOptions options);
 
     /// \brief Returns the options specified on refinement
     AdaptiveOptions GetAdaptiveOptions() const { return _adaptiveOptions; }
 
-    /// \brief Unrefine the topology, keeping only the base level.
+    /// \brief Unrefine the topology (keep control cage)
     void Unrefine();
 
 
@@ -206,7 +165,7 @@ public:
     /// \brief Returns the number of face-varying channels in the tables
     int GetNumFVarChannels() const;
 
-    /// \brief Returns the face-varying interpolation rule set for a given channel
+    /// \brief Returns the face-varying interpolation rule-set for a given channel
     Sdc::Options::FVarLinearInterpolation GetFVarLinearInterpolation(int channel = 0) const;
 
     /// \brief Returns the total number of face-varying values in all levels
@@ -222,17 +181,12 @@ protected:
     template <class MESH>
     friend class TopologyRefinerFactory;
     friend class TopologyRefinerFactoryBase;
-    friend class PatchTableBuilder;
-    friend class PatchBuilder;
+    friend class PatchTableFactory;
+    friend class EndCapGregoryBasisPatchFactory;
+    friend class EndCapLegacyGregoryPatchFactory;
     friend class PtexIndices;
-    template <typename REAL>
-    friend class PrimvarRefinerReal;
+    friend class PrimvarRefiner;
 
-    //  Copy constructor exposed via the factory class:
-    TopologyRefiner(TopologyRefiner const & source);
-
-public:
-    //  Levels and Refinements available internally (avoids need for more friends)
     Vtr::internal::Level & getLevel(int l) { return *_levels[l]; }
     Vtr::internal::Level const & getLevel(int l) const { return *_levels[l]; }
 
@@ -242,13 +196,10 @@ public:
 private:
     //  Not default constructible or copyable:
     TopologyRefiner() : _uniformOptions(0), _adaptiveOptions(0) { }
+    TopologyRefiner(TopologyRefiner const &) : _uniformOptions(0), _adaptiveOptions(0) { }
     TopologyRefiner & operator=(TopologyRefiner const &) { return *this; }
 
-    void selectFeatureAdaptiveComponents(Vtr::internal::SparseSelector& selector,
-                                         internal::FeatureMask const & mask,
-                                         ConstIndexArray selectedFaces);
-    void selectLinearIrregularFaces(Vtr::internal::SparseSelector& selector,
-                                    ConstIndexArray selectedFaces);
+    void selectFeatureAdaptiveComponents(Vtr::internal::SparseSelector& selector);
 
     void initializeInventory();
     void updateInventory(Vtr::internal::Level const & newLevel);
@@ -262,11 +213,9 @@ private:
     Sdc::SchemeType _subdivType;
     Sdc::Options    _subdivOptions;
 
-    unsigned int _isUniform     : 1;
-    unsigned int _hasHoles      : 1;
-    unsigned int _hasIrregFaces : 1;
-    unsigned int _regFaceSize   : 3;
-    unsigned int _maxLevel      : 4;
+    unsigned int _isUniform : 1,
+                 _hasHoles : 1,
+                 _maxLevel : 4;
 
     //  Options assigned on refinement:
     UniformOptions  _uniformOptions;
@@ -279,9 +228,7 @@ private:
     int _totalFaceVertices;
     int _maxValence;
 
-    //  Note the base level may be shared with another instance
-    bool _baseLevelOwned;
-
+    //  There is some redundancy here -- to be reduced later
     std::vector<Vtr::internal::Level *>      _levels;
     std::vector<Vtr::internal::Refinement *> _refinements;
 

@@ -44,20 +44,12 @@
     outpt.color = \
         mix(mix(inpt[a].color, inpt[b].color, UV.x), \
             mix(inpt[c].color, inpt[d].color, UV.x), UV.y)
-
-#undef OSD_USER_VARYING_PER_EVAL_POINT_TRIANGLE
-#define OSD_USER_VARYING_PER_EVAL_POINT_TRIANGLE(UV, a, b, c) \
-    outpt.color = \
-        inpt[a].color * (1.0f - UV.x - UV.y) + \
-        inpt[b].color * UV.x + \
-        inpt[c].color * UV.y;
 #else
 #define OSD_USER_VARYING_DECLARE
 #define OSD_USER_VARYING_ATTRIBUTE_DECLARE
 #define OSD_USER_VARYING_PER_VERTEX()
 #define OSD_USER_VARYING_PER_CONTROL_POINT(ID_OUT, ID_IN)
 #define OSD_USER_VARYING_PER_EVAL_POINT(UV, a, b, c, d)
-#define OSD_USER_VARYING_PER_EVAL_POINT_TRIANGLE(UV, a, b, c)
 #endif
 
 //--------------------------------------------------------------
@@ -179,44 +171,6 @@ out block {
     OSD_USER_VARYING_DECLARE
 } outpt;
 
-uniform isamplerBuffer OsdFVarParamBuffer;
-layout(std140) uniform OsdFVarArrayData {
-    OsdPatchArray fvarPatchArray[2];
-};
-
-vec2
-interpolateFaceVarying(vec2 uv, int fvarOffset)
-{
-    int patchIndex = OsdGetPatchIndex(gl_PrimitiveID);
-
-    OsdPatchArray array = fvarPatchArray[0];
-
-    ivec3 fvarPatchParam = texelFetch(OsdFVarParamBuffer, patchIndex).xyz;
-    OsdPatchParam param = OsdPatchParamInit(fvarPatchParam.x,
-                                            fvarPatchParam.y,
-                                            fvarPatchParam.z);
-
-    int patchType = OsdPatchParamIsRegular(param) ? array.regDesc : array.desc;
-
-    float wP[20], wDu[20], wDv[20], wDuu[20], wDuv[20], wDvv[20];
-    int numPoints = OsdEvaluatePatchBasisNormalized(patchType, param,
-                uv.s, uv.t, wP, wDu, wDv, wDuu, wDuv, wDvv);
-
-    int patchArrayStride = numPoints;
-
-    int primOffset = patchIndex * patchArrayStride;
-
-    vec2 result = vec2(0);
-    for (int i=0; i<numPoints; ++i) {
-        int index = (primOffset+i)*OSD_FVAR_WIDTH + fvarOffset;
-        vec2 cv = vec2(texelFetch(OsdFVarDataBuffer, index).s,
-                       texelFetch(OsdFVarDataBuffer, index + 1).s);
-        result += wP[i] * cv;
-    }
-
-    return result;
-}
-
 void emit(int index, vec3 normal)
 {
     outpt.v.position = inpt[index].v.position;
@@ -236,22 +190,21 @@ void emit(int index, vec3 normal)
 #endif
 
 #ifdef SHADING_FACEVARYING_COLOR
+#ifdef LOOP  // ----- scheme : LOOP
+    vec2 uv;
+    OSD_COMPUTE_FACE_VARYING_TRI_2(uv, /*fvarOffste=*/0, index);
+
+#else        // ----- scheme : CATMARK / BILINEAR
+
 #ifdef SHADING_FACEVARYING_UNIFORM_SUBDIVISION
-    // interpolate fvar data at refined tri or quad vertex locations
-#ifdef PRIM_TRI
-    vec2 trist[3] = vec2[](vec2(0,0), vec2(1,0), vec2(0,1));
-    vec2 st = trist[index];
-#endif
-#ifdef PRIM_QUAD
     vec2 quadst[4] = vec2[](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1));
     vec2 st = quadst[index];
-#endif
 #else
-    // interpolate fvar data at tessellated vertex locations
     vec2 st = inpt[index].v.tessCoord;
 #endif
-
-    vec2 uv = interpolateFaceVarying(st, /*fvarOffset*/0);
+    vec2 uv;
+    OSD_COMPUTE_FACE_VARYING_2(uv, /*fvarOffset=*/0, st);
+#endif      // ------ scheme
     outpt.color = vec3(uv.s, uv.t, 0);
 #endif
 
@@ -325,8 +278,8 @@ void main()
 #endif // PRIM_QUAD
 
 #ifdef PRIM_TRI
-    vec3 A = (inpt[0].v.position - inpt[1].v.position).xyz;
-    vec3 B = (inpt[2].v.position - inpt[1].v.position).xyz;
+    vec3 A = (inpt[1].v.position - inpt[0].v.position).xyz;
+    vec3 B = (inpt[2].v.position - inpt[0].v.position).xyz;
     vec3 n0 = normalize(cross(B, A));
 
 #if defined(GEOMETRY_OUT_WIRE) || defined(GEOMETRY_OUT_LINE)
@@ -465,11 +418,11 @@ getAdaptivePatchColor(ivec3 patchParam)
         vec4(0.0f,  0.8f,  0.75f, 1.0f),   // boundary pattern 4
 
         vec4(0.0f,  1.0f,  0.0f,  1.0f),   // corner
-        vec4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 0
-        vec4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 1
-        vec4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 2
-        vec4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 3
-        vec4(0.5f,  1.0f,  0.5f,  1.0f),   // corner pattern 4
+        vec4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 0
+        vec4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 1
+        vec4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 2
+        vec4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 3
+        vec4(0.25f, 0.25f, 0.25f, 1.0f),   // corner pattern 4
 
         vec4(1.0f,  1.0f,  0.0f,  1.0f),   // gregory
         vec4(1.0f,  1.0f,  0.0f,  1.0f),   // gregory
@@ -499,8 +452,8 @@ getAdaptivePatchColor(ivec3 patchParam)
     if (edgeCount == 1) {
         patchType = 2; // BOUNDARY
     }
-    if (edgeCount > 1) {
-        patchType = 3; // CORNER (not correct for patches that are not isolated)
+    if (edgeCount == 2) {
+        patchType = 3; // CORNER
     }
 
 #if defined OSD_PATCH_ENABLE_SINGLE_CREASE
@@ -514,26 +467,11 @@ getAdaptivePatchColor(ivec3 patchParam)
     patchType = 5;
 #elif defined OSD_PATCH_GREGORY_BASIS
     patchType = 6;
-#elif defined OSD_PATCH_GREGORY_TRIANGLE
-    patchType = 6;
 #endif
 
     int pattern = bitCount(OsdGetPatchTransitionMask(patchParam));
 
     return patchColors[6*patchType + pattern];
-}
-
-vec4
-getAdaptiveDepthColor(ivec3 patchParam)
-{
-    //  Represent depth with repeating cycle of four colors:
-    const vec4 depthColors[4] = vec4[4](
-        vec4(0.0f,  0.5f,  0.5f,  1.0f),
-        vec4(1.0f,  1.0f,  1.0f,  1.0f),
-        vec4(0.0f,  1.0f,  1.0f,  1.0f),
-        vec4(0.5f,  1.0f,  0.5f,  1.0f)
-    );
-    return depthColors[OsdGetPatchRefinementLevel(patchParam) & 3];
 }
 
 #if defined(PRIM_QUAD) || defined(PRIM_TRI)
@@ -550,8 +488,6 @@ main()
                       int(floor(20*inpt.color.r)+floor(20*inpt.color.g))&1, 1);
 #elif defined(SHADING_PATCH_TYPE)
     vec4 color = getAdaptivePatchColor(OsdGetPatchParam(OsdGetPatchIndex(gl_PrimitiveID)));
-#elif defined(SHADING_PATCH_DEPTH)
-    vec4 color = getAdaptiveDepthColor(OsdGetPatchParam(OsdGetPatchIndex(gl_PrimitiveID)));
 #elif defined(SHADING_PATCH_COORD)
     vec4 color = vec4(inpt.v.patchCoord.xy, 0, 1);
 #elif defined(SHADING_MATERIAL)

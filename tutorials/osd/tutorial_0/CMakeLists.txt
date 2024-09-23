@@ -26,7 +26,7 @@ set(SOURCE_FILES
     osd_tutorial_0.cpp
 )
 
-osd_add_executable(osd_tutorial_0 "tutorials/osd"
+add_executable(osd_tutorial_0
     ${SOURCE_FILES}
 )
 

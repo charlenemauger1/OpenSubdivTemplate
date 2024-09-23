@@ -22,30 +22,26 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
+#include "../common/glUtils.h"
 
 #include <GLFW/glfw3.h>
 GLFWwindow* g_window = 0;
 GLFWmonitor* g_primary = 0;
 
-#include <opensubdiv/far/error.h>
-#include <opensubdiv/osd/cpuEvaluator.h>
-#include <opensubdiv/osd/cpuVertexBuffer.h>
-#include <opensubdiv/osd/cpuGLVertexBuffer.h>
-#include <opensubdiv/osd/glMesh.h>
+#include <far/error.h>
+#include <osd/cpuEvaluator.h>
+#include <osd/cpuGLVertexBuffer.h>
+#include <osd/glMesh.h>
 OpenSubdiv::Osd::GLMeshInterface *g_mesh = NULL;
 
 #include "../../regression/common/far_utils.h"
-#include "../../regression/common/arg_utils.h"
 #include "../common/stopwatch.h"
 #include "../common/simple_math.h"
 #include "../common/glControlMeshDisplay.h"
 #include "../common/glHud.h"
 #include "../common/glShaderCache.h"
-#include "../common/glUtils.h"
-#include "../common/viewerArgsUtils.h"
 
-#include <opensubdiv/osd/glslPatchShaderSource.h>
+#include <osd/glslPatchShaderSource.h>
 static const char *shaderSource =
 #if defined(GL_ARB_tessellation_shader) || defined(GL_VERSION_4_0)
     #include "shader.gen.h"
@@ -66,26 +62,19 @@ enum DisplayStyle { kWire = 0,
                     kShaded,
                     kWireShaded };
 
-enum EndCap       { kEndCapBilinearBasis,
-                    kEndCapBSplineBasis,
-                    kEndCapGregoryBasis };
-
 int g_currentShape = 0;
 
 int   g_frame = 0,
       g_repeatCount = 0;
 
-OpenSubdiv::Sdc::Options::FVarLinearInterpolation  g_fvarInterp =
+OpenSubdiv::Sdc::Options::FVarLinearInterpolation  g_fvarBoundary =
     OpenSubdiv::Sdc::Options::FVAR_LINEAR_ALL;
 
 // GUI variables
-int   g_freeze = 0,
-      g_uvCullBackface = 0,
+int   g_fullscreen = 0,
+      g_freeze = 0,
       g_displayStyle = kWireShaded,
-      g_adaptive = 1,
-      g_smoothCornerPatch = 1,
-      g_singleCreasePatch = 1,
-      g_infSharpPatch = 1,
+      g_adaptive = 0,
       g_mbutton[3] = {0, 0, 0},
       g_mouseUvView = 0,
       g_running = 1;
@@ -99,8 +88,6 @@ float g_rotate[2] = {0, 0},
       g_size = 0,
       g_uvPan[2] = {0, 0},
       g_uvScale = 1.0;
-
-bool  g_yup = false;
 
 int   g_prev_x = 0,
       g_prev_y = 0;
@@ -118,7 +105,6 @@ std::vector<float> g_orgPositions,
 
 Scheme             g_scheme;
 
-int g_endCap = kEndCapGregoryBasis;
 int g_level = 2;
 int g_tessLevel = 1;
 int g_tessLevelMin = 1;
@@ -126,9 +112,7 @@ int g_tessLevelMin = 1;
 GLuint g_transformUB = 0,
        g_transformBinding = 0,
        g_tessellationUB = 0,
-       g_tessellationBinding = 0,
-       g_fvarArrayDataUB = 0,
-       g_fvarArrayDataBinding = 0;
+       g_tessellationBinding = 0;
 
 struct Transform {
     float ModelViewMatrix[16];
@@ -154,7 +138,7 @@ struct Program {
 struct FVarData
 {
     FVarData() :
-        textureBuffer(0), textureParamBuffer(0) {
+        textureBuffer(0) {
     }
     ~FVarData() {
         Release();
@@ -163,57 +147,11 @@ struct FVarData
         if (textureBuffer)
             glDeleteTextures(1, &textureBuffer);
         textureBuffer = 0;
-        if (textureParamBuffer)
-            glDeleteTextures(1, &textureParamBuffer);
-        textureParamBuffer = 0;
     }
-    void Create(OpenSubdiv::Far::TopologyRefiner const *refiner,
-                OpenSubdiv::Far::PatchTable const *patchTable,
-                std::vector<float> const & fvarSrcData,
-                int fvarWidth, int fvarChannel = 0) {
-
-        using namespace OpenSubdiv;
-
+    void Create(OpenSubdiv::Far::PatchTable const *patchTable,
+                int fvarWidth, std::vector<float> const & fvarSrcData) {
         Release();
-
-        Far::StencilTableFactory::Options soptions;
-        soptions.interpolationMode = Far::StencilTableFactory::INTERPOLATE_FACE_VARYING;
-        soptions.fvarChannel = fvarChannel;
-        soptions.generateOffsets = true;
-        soptions.generateIntermediateLevels = !refiner->IsUniform();
-        Far::StencilTable const *fvarStencils =
-            Far::StencilTableFactory::Create(*refiner, soptions);
-
-        if (Far::StencilTable const *fvarStencilsWithLocalPoints =
-            Far::StencilTableFactory::AppendLocalPointStencilTableFaceVarying(
-                *refiner,
-                fvarStencils,
-                patchTable->GetLocalPointFaceVaryingStencilTable(),
-                fvarChannel)) {
-            delete fvarStencils;
-            fvarStencils = fvarStencilsWithLocalPoints;
-        }
-
-        int numSrcFVarPoints = (int)fvarSrcData.size() / fvarWidth;
-        int numFVarPoints = numSrcFVarPoints
-                          + fvarStencils->GetNumStencils();
-
-        Osd::CpuVertexBuffer *fvarBuffer =
-            Osd::CpuVertexBuffer::Create(fvarWidth, numFVarPoints);
-        fvarBuffer->UpdateData(&fvarSrcData[0], 0, numSrcFVarPoints);
-
-        Osd::BufferDescriptor srcDesc(0, fvarWidth, fvarWidth);
-        Osd::BufferDescriptor dstDesc(numSrcFVarPoints*fvarWidth,
-                                      fvarWidth, fvarWidth);
-
-        Osd::CpuEvaluator::EvalStencils(fvarBuffer, srcDesc,
-                                        fvarBuffer, dstDesc,
-                                        fvarStencils);
-
-        Far::ConstIndexArray indices = patchTable->GetFVarValues();
-        const float * fvarSrcDataPtr = !refiner->IsUniform()
-            ? fvarBuffer->BindCpuBuffer()
-            : fvarBuffer->BindCpuBuffer() + numSrcFVarPoints * fvarWidth;
+        OpenSubdiv::Far::ConstIndexArray indices = patchTable->GetFVarValues();
 
         // expand fvardata to per-patch array
         std::vector<float> data;
@@ -222,7 +160,7 @@ struct FVarData
         for (int fvert = 0; fvert < (int)indices.size(); ++fvert) {
             int index = indices[fvert] * fvarWidth;
             for (int i = 0; i < fvarWidth; ++i) {
-                data.push_back(fvarSrcDataPtr[index++]);
+                data.push_back(fvarSrcData[index++]);
             }
         }
         GLuint buffer;
@@ -231,32 +169,15 @@ struct FVarData
         glBufferData(GL_ARRAY_BUFFER, data.size()*sizeof(float),
                      &data[0], GL_STATIC_DRAW);
 
-        delete fvarBuffer;
-
         glGenTextures(1, &textureBuffer);
         glBindTexture(GL_TEXTURE_BUFFER, textureBuffer);
         glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, buffer);
         glBindTexture(GL_TEXTURE_BUFFER, 0);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        glDeleteBuffers(1, &buffer);
-
-        Far::ConstPatchParamArray fvarParam = patchTable->GetFVarPatchParams();
-
-        glGenBuffers(1, &buffer);
-        glBindBuffer(GL_ARRAY_BUFFER, buffer);
-        glBufferData(GL_ARRAY_BUFFER, fvarParam.size()*sizeof(Far::PatchParam),
-                     &fvarParam[0], GL_STATIC_DRAW);
-
-        glGenTextures(1, &textureParamBuffer);
-        glBindTexture(GL_TEXTURE_BUFFER, textureParamBuffer);
-        glTexBuffer(GL_TEXTURE_BUFFER, GL_RG32I, buffer);
-        glBindTexture(GL_TEXTURE_BUFFER, 0);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindTexture(GL_ARRAY_BUFFER, 0);
 
         glDeleteBuffers(1, &buffer);
     }
-    GLuint textureBuffer, textureParamBuffer;
+    GLuint textureBuffer;
 } g_fvarData;
 
 //------------------------------------------------------------------------------
@@ -416,18 +337,13 @@ rebuildMesh() {
     int level = g_level;
     Scheme scheme = g_defaultShapes[g_currentShape].scheme;
 
-    Shape * shape = Shape::parseObj(shapeDesc);
-
-    if (!shape->HasUV()) {
-        printf("Error: shape %s does not contain face-varying UVs\n", shapeDesc.name.c_str());
-        exit(1);
-    }
+    Shape * shape = Shape::parseObj(shapeDesc.data.c_str(), shapeDesc.scheme);
 
     // create Far mesh (topology)
     OpenSubdiv::Sdc::SchemeType sdctype = GetSdcType(*shape);
     OpenSubdiv::Sdc::Options sdcoptions = GetSdcOptions(*shape);
 
-    sdcoptions.SetFVarLinearInterpolation(g_fvarInterp);
+    sdcoptions.SetFVarLinearInterpolation(g_fvarBoundary);
 
     OpenSubdiv::Far::TopologyRefiner * refiner =
         OpenSubdiv::Far::TopologyRefinerFactory<Shape>::Create(*shape,
@@ -444,17 +360,12 @@ rebuildMesh() {
 
     g_scheme = scheme;
 
-    OpenSubdiv::Osd::MeshBitset bits;
-    bits.set(OpenSubdiv::Osd::MeshAdaptive, g_adaptive != 0);
-    bits.set(OpenSubdiv::Osd::MeshUseSmoothCornerPatch, g_smoothCornerPatch != 0);
-    bits.set(OpenSubdiv::Osd::MeshUseSingleCreasePatch, g_singleCreasePatch != 0);
-    bits.set(OpenSubdiv::Osd::MeshUseInfSharpPatch, g_infSharpPatch != 0);
-    bits.set(OpenSubdiv::Osd::MeshFVarData, 1);
-    bits.set(OpenSubdiv::Osd::MeshFVarAdaptive, 1);
-    bits.set(OpenSubdiv::Osd::MeshEndCapBilinearBasis, g_endCap == kEndCapBilinearBasis);
-    bits.set(OpenSubdiv::Osd::MeshEndCapBSplineBasis, g_endCap == kEndCapBSplineBasis);
-    bits.set(OpenSubdiv::Osd::MeshEndCapGregoryBasis, g_endCap == kEndCapGregoryBasis);
+    // Adaptive refinement currently supported only for catmull-clark scheme
+    bool doAdaptive = (g_adaptive!=0 and g_scheme==kCatmark);
 
+    OpenSubdiv::Osd::MeshBitset bits;
+    bits.set(OpenSubdiv::Osd::MeshAdaptive, doAdaptive);
+    bits.set(OpenSubdiv::Osd::MeshFVarData, 1);
 
     int numVertexElements = 3;
     int numVaryingElements = 0;
@@ -469,9 +380,13 @@ rebuildMesh() {
                                            numVaryingElements,
                                            level, bits);
 
+    std::vector<float> fvarData;
+
+    InterpolateFVarData(*refiner, *shape, fvarData);
+
     // set fvardata to texture buffer
-    g_fvarData.Create(refiner, g_mesh->GetFarPatchTable(),
-                      shape->uvs, shape->GetFVarWidth());
+    g_fvarData.Create(g_mesh->GetFarPatchTable(),
+                      shape->GetFVarWidth(), fvarData);
 
     delete shape;
 
@@ -546,8 +461,7 @@ GetEffect(bool uvDraw = false) {
 
 struct EffectDesc {
     EffectDesc(OpenSubdiv::Far::PatchDescriptor desc,
-               Effect effect) : desc(desc),
-                                effect(effect),
+               Effect effect) : desc(desc), effect(effect),
                                 maxValence(0), numElements(0) { }
 
     OpenSubdiv::Far::PatchDescriptor desc;
@@ -587,6 +501,9 @@ public:
 
         if (type == Far::PatchDescriptor::QUADS) {
             ss << "#define PRIM_QUAD\n";
+        } else if (type == Far::PatchDescriptor::TRIANGLES) {
+            ss << "#define PRIM_TRI\n";
+            ss << "#define LOOP\n";
         } else {
             ss << "#define PRIM_TRI\n";
         }
@@ -615,13 +532,11 @@ public:
         // face varying width
         ss << "#define OSD_FVAR_WIDTH 2\n";
 
-        if (! effectDesc.desc.IsAdaptive()) {
+        if (not effectDesc.desc.IsAdaptive()) {
             ss << "#define SHADING_FACEVARYING_UNIFORM_SUBDIVISION\n";
         }
 
         // include osd PatchCommon
-        ss << "#define OSD_PATCH_BASIS_GLSL\n";
-        ss << Osd::GLSLPatchShaderSource::GetPatchBasisShaderSource();
         ss << Osd::GLSLPatchShaderSource::GetCommonShaderSource();
         std::string common = ss.str();
         ss.str("");
@@ -683,11 +598,6 @@ public:
         if (uboIndex != GL_INVALID_INDEX)
             glUniformBlockBinding(program, uboIndex, g_tessellationBinding);
 
-        g_fvarArrayDataBinding = 2;
-        uboIndex = glGetUniformBlockIndex(program, "OsdFVarArrayData");
-        if (uboIndex != GL_INVALID_INDEX)
-            glUniformBlockBinding(program, uboIndex, g_fvarArrayDataBinding);
-
         // assign texture locations
         GLint loc;
         glUseProgram(program);
@@ -696,9 +606,6 @@ public:
         }
         if ((loc = glGetUniformLocation(program, "OsdFVarDataBuffer")) != -1) {
             glUniform1i(loc, 1); // GL_TEXTURE1
-        }
-        if ((loc = glGetUniformLocation(program, "OsdFVarParamBuffer")) != -1) {
-            glUniform1i(loc, 2); // GL_TEXTURE2
         }
 
 
@@ -711,9 +618,6 @@ ShaderCache g_shaderCache;
 //------------------------------------------------------------------------------
 static void
 updateUniformBlocks() {
-
-    using namespace OpenSubdiv;
-
     if (!g_transformUB) {
         glGenBuffers(1, &g_transformUB);
         glBindBuffer(GL_UNIFORM_BUFFER, g_transformUB);
@@ -746,28 +650,6 @@ updateUniformBlocks() {
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
     glBindBufferBase(GL_UNIFORM_BUFFER, g_tessellationBinding, g_tessellationUB);
-
-    // Update and bind fvar patch array state
-    Osd::PatchArrayVector const &fvarPatchArrays =
-        g_mesh->GetPatchTable()->GetFVarPatchArrays();
-    if (! fvarPatchArrays.empty()) {
-	// bind patch arrays UBO (std140 struct size padded to vec4 alignment)
-	int patchArraySize =
-	    sizeof(GLint) * ((sizeof(Osd::PatchArray)/sizeof(GLint) + 3) & ~3);
-        if (!g_fvarArrayDataUB) {
-            glGenBuffers(1, &g_fvarArrayDataUB);
-        }
-	glBindBuffer(GL_UNIFORM_BUFFER, g_fvarArrayDataUB);
-	glBufferData(GL_UNIFORM_BUFFER,
-	    fvarPatchArrays.size()*patchArraySize, NULL, GL_STATIC_DRAW);
-	for (int i=0; i<(int)fvarPatchArrays.size(); ++i) {
-	    glBufferSubData(GL_UNIFORM_BUFFER,
-		i*patchArraySize, sizeof(Osd::PatchArray), &fvarPatchArrays[i]);
-	}
-
-        glBindBufferBase(GL_UNIFORM_BUFFER,
-                g_fvarArrayDataBinding, g_fvarArrayDataUB);
-    }
 }
 
 static void
@@ -779,15 +661,12 @@ bindTextures() {
     }
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_BUFFER, g_fvarData.textureBuffer);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_BUFFER, g_fvarData.textureParamBuffer);
 
     glActiveTexture(GL_TEXTURE0);
 }
 
 static GLenum
-bindProgram(Effect effect,
-            OpenSubdiv::Osd::PatchArray const & patch) {
+bindProgram(Effect effect, OpenSubdiv::Osd::PatchArray const & patch) {
 
     EffectDesc effectDesc(patch.GetDescriptor(), effect);
 
@@ -846,9 +725,7 @@ display() {
     translate(g_transformData.ModelViewMatrix, -g_pan[0], -g_pan[1], -g_dolly);
     rotate(g_transformData.ModelViewMatrix, g_rotate[1], 1, 0, 0);
     rotate(g_transformData.ModelViewMatrix, g_rotate[0], 0, 1, 0);
-    if (!g_yup) {
-        rotate(g_transformData.ModelViewMatrix, -90, 1, 0, 0);
-    }
+    rotate(g_transformData.ModelViewMatrix, -90, 1, 0, 0);
     translate(g_transformData.ModelViewMatrix,
               -g_center[0], -g_center[1], -g_center[2]);
     perspective(g_transformData.ProjectionMatrix,
@@ -863,7 +740,7 @@ display() {
 
     glEnable(GL_DEPTH_TEST);
 
-    // make sure that the vertex buffer is interoped back as a GL resource.
+    // make sure that the vertex buffer is interoped back as a GL resources.
     GLuint vbo = g_mesh->BindVertexBuffer();
 
     glBindVertexArray(g_vao);
@@ -871,8 +748,8 @@ display() {
     OpenSubdiv::Osd::PatchArrayVector const & patches =
         g_mesh->GetPatchTable()->GetPatchArrays();
 
-    if (g_displayStyle != kWire)
-        glEnable(GL_CULL_FACE);
+    if (g_displayStyle == kWire)
+        glDisable(GL_CULL_FACE);
 
     updateUniformBlocks();
     bindTextures();
@@ -889,8 +766,8 @@ display() {
             GL_UNSIGNED_INT,
             (void *)(patch.GetIndexBase() * sizeof(unsigned int)));
     }
-    if (g_displayStyle != kWire)
-        glDisable(GL_CULL_FACE);
+    if (g_displayStyle == kWire)
+        glEnable(GL_CULL_FACE);
 
     glBindVertexArray(0);
     glUseProgram(0);
@@ -909,9 +786,6 @@ display() {
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    if (g_uvCullBackface)
-        glEnable(GL_CULL_FACE);
-
     for (int i = 0; i < (int)patches.size(); ++i) {
         OpenSubdiv::Osd::PatchArray const & patch = patches[i];
 
@@ -923,9 +797,6 @@ display() {
             GL_UNSIGNED_INT,
             (void *)(patch.GetIndexBase() * sizeof(unsigned int)));
     }
-
-    if (g_uvCullBackface)
-        glDisable(GL_CULL_FACE);
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -950,7 +821,7 @@ motion(GLFWwindow *, double dx, double dy) {
             // pan
             g_uvPan[0] -= (x - g_prev_x) * 2 / g_uvScale / static_cast<float>(g_width/2);
             g_uvPan[1] += (y - g_prev_y) * 2 / g_uvScale / static_cast<float>(g_height);
-        } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) ||
+        } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) or
                    (!g_mbutton[0] && g_mbutton[1] && !g_mbutton[2])) {
             // scale
             g_uvScale += g_uvScale*0.01f*(x - g_prev_x);
@@ -965,7 +836,7 @@ motion(GLFWwindow *, double dx, double dy) {
             // pan
             g_pan[0] -= g_dolly*(x - g_prev_x)/g_width;
             g_pan[1] += g_dolly*(y - g_prev_y)/g_height;
-        } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) ||
+        } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) or
                    (!g_mbutton[0] && g_mbutton[1] && !g_mbutton[2])) {
             // dolly
             g_dolly -= g_dolly*0.01f*(x - g_prev_x);
@@ -1057,12 +928,6 @@ callbackDisplayStyle(int b) {
 }
 
 static void
-callbackEndCap(int endCap) {
-    g_endCap = endCap;
-    rebuildMesh();
-}
-
-static void
 callbackLevel(int l) {
 
     g_level = l;
@@ -1078,78 +943,38 @@ callbackModel(int m) {
 }
 
 static void
-callbackControlEdges(bool checked, int /* a */) {
-
-    g_controlMeshDisplay.SetEdgesDisplay(checked);
-    rebuildMesh();
-}
-
-static void
-callbackControlVertices(bool checked, int /* a */) {
-
-    g_controlMeshDisplay.SetVerticesDisplay(checked);
-    rebuildMesh();
-}
-
-static void
-callbackUVCullBackface(bool checked, int /* a */) {
-
-    g_uvCullBackface = checked;
-    rebuildMesh();
-}
-
-static void
 callbackAdaptive(bool checked, int /* a */) {
 
-    g_adaptive = checked;
-    rebuildMesh();
+    if (GLUtils::SupportsAdaptiveTessellation()) {
+        g_adaptive = checked;
+        rebuildMesh();
+    }
 }
 
 static void
-callbackSmoothCornerPatch(bool checked, int /* a */) {
-
-    g_smoothCornerPatch = checked;
-    rebuildMesh();
-}
-
-static void
-callbackSingleCreasePatch(bool checked, int /* a */) {
-
-    g_singleCreasePatch = checked;
-    rebuildMesh();
-}
-
-static void
-callbackInfSharpPatch(bool checked, int /* a */) {
-
-    g_infSharpPatch = checked;
-    rebuildMesh();
-}
-
-static void
-callbackFVarInterp(int b) {
+callbackBoundary(int b) {
 
     typedef OpenSubdiv::Sdc::Options SdcOptions;
 
     switch (b) {
 
         case SdcOptions::FVAR_LINEAR_NONE :
-            g_fvarInterp = SdcOptions::FVAR_LINEAR_NONE; break;
+            g_fvarBoundary = SdcOptions::FVAR_LINEAR_NONE; break;
 
         case SdcOptions::FVAR_LINEAR_CORNERS_ONLY :
-            g_fvarInterp = SdcOptions::FVAR_LINEAR_CORNERS_ONLY; break;
+            g_fvarBoundary = SdcOptions::FVAR_LINEAR_CORNERS_ONLY; break;
 
         case SdcOptions::FVAR_LINEAR_CORNERS_PLUS1 :
-            g_fvarInterp = SdcOptions::FVAR_LINEAR_CORNERS_PLUS1; break;
+            g_fvarBoundary = SdcOptions::FVAR_LINEAR_CORNERS_PLUS1; break;
 
         case SdcOptions::FVAR_LINEAR_CORNERS_PLUS2 :
-            g_fvarInterp = SdcOptions::FVAR_LINEAR_CORNERS_PLUS2; break;
+            g_fvarBoundary = SdcOptions::FVAR_LINEAR_CORNERS_PLUS2; break;
 
         case SdcOptions::FVAR_LINEAR_BOUNDARIES :
-            g_fvarInterp = SdcOptions::FVAR_LINEAR_BOUNDARIES; break;
+            g_fvarBoundary = SdcOptions::FVAR_LINEAR_BOUNDARIES; break;
 
         case SdcOptions::FVAR_LINEAR_ALL :
-            g_fvarInterp = SdcOptions::FVAR_LINEAR_ALL; break;
+            g_fvarBoundary = SdcOptions::FVAR_LINEAR_ALL; break;
 
     }
     rebuildMesh();
@@ -1166,62 +991,35 @@ initHUD() {
 
     g_hud.Init(windowWidth, windowHeight, frameBufferWidth, frameBufferHeight);
 
-    g_hud.AddCheckBox("Control edges (H)", g_controlMeshDisplay.GetEdgesDisplay(),
-                      10,  60, callbackControlEdges, 0, 'h');
-    g_hud.AddCheckBox("Control vertices (J)", g_controlMeshDisplay.GetVerticesDisplay(),
-                      10,  80, callbackControlVertices, 0, 'j');
-    g_hud.AddCheckBox("UV Backface Culling (B)", g_uvCullBackface != 0,
-                      10, 100, callbackUVCullBackface, 0, 'b');
-
-    int shading_pulldown = g_hud.AddPullDown("Display Style (W)",
-                                             400, 10, 250, callbackDisplayStyle, 'w');
+    int shading_pulldown = g_hud.AddPullDown("Shading (W)", 375, 10, 250, callbackDisplayStyle, 'w');
     g_hud.AddPullDownButton(shading_pulldown, "Wire", kWire, g_displayStyle==kWire);
     g_hud.AddPullDownButton(shading_pulldown, "Shaded", kShaded, g_displayStyle==kShaded);
     g_hud.AddPullDownButton(shading_pulldown, "Wire+Shaded", kWireShaded, g_displayStyle==kWireShaded);
 
-    if (GLUtils::SupportsAdaptiveTessellation()) {
-        g_hud.AddCheckBox("Adaptive (`)", g_adaptive != 0,
-                          10, 140, callbackAdaptive, 0, '`');
-
-        g_hud.AddCheckBox("Smooth Corner Patch (O)", g_smoothCornerPatch!=0,
-                          10, 160, callbackSmoothCornerPatch, 0, 'o');
-        g_hud.AddCheckBox("Single Crease Patch (S)", g_singleCreasePatch!=0,
-                          10, 180, callbackSingleCreasePatch, 0, 's');
-        g_hud.AddCheckBox("Inf Sharp Patch (I)", g_infSharpPatch!=0,
-                          10, 200, callbackInfSharpPatch, 0, 'i');
-
-        int endcap_pulldown = g_hud.AddPullDown("End cap (E)",
-                                                10, 220, 200, callbackEndCap, 'e');
-        g_hud.AddPullDownButton(endcap_pulldown, "Linear", kEndCapBilinearBasis,
-                                g_endCap == kEndCapBilinearBasis);
-        g_hud.AddPullDownButton(endcap_pulldown, "Regular", kEndCapBSplineBasis,
-                                g_endCap == kEndCapBSplineBasis);
-        g_hud.AddPullDownButton(endcap_pulldown, "Gregory", kEndCapGregoryBasis,
-                                g_endCap == kEndCapGregoryBasis);
-    }
+    if (GLUtils::SupportsAdaptiveTessellation())
+        g_hud.AddCheckBox("Adaptive (`)", g_adaptive != 0, 10, 250, callbackAdaptive, 0, '`');
 
     for (int i = 1; i < 11; ++i) {
         char level[16];
         sprintf(level, "Lv. %d", i);
-        g_hud.AddRadioButton(3, level, i == g_level, 10, 260 + i*20, callbackLevel, i, '0'+(i%10));
+        g_hud.AddRadioButton(3, level, i == 2, 10, 270 + i*20, callbackLevel, i, '0'+(i%10));
     }
 
     typedef OpenSubdiv::Sdc::Options SdcOptions;
 
-    int fvar_interp_pulldown = g_hud.AddPullDown("Linear Interpolation (L)",
-                                                 10, 10, 250, callbackFVarInterp, 'l');
-    g_hud.AddPullDownButton(fvar_interp_pulldown, "None (edge only)",
-        SdcOptions::FVAR_LINEAR_NONE, g_fvarInterp==SdcOptions::FVAR_LINEAR_NONE);
-    g_hud.AddPullDownButton(fvar_interp_pulldown, "Corners Only",
-        SdcOptions::FVAR_LINEAR_CORNERS_ONLY, g_fvarInterp==SdcOptions::FVAR_LINEAR_CORNERS_ONLY);
-    g_hud.AddPullDownButton(fvar_interp_pulldown, "Corners 1 (edge corner)",
-        SdcOptions::FVAR_LINEAR_CORNERS_PLUS1, g_fvarInterp==SdcOptions::FVAR_LINEAR_CORNERS_PLUS1);
-    g_hud.AddPullDownButton(fvar_interp_pulldown, "Corners 2 (edge corner prop)",
-        SdcOptions::FVAR_LINEAR_CORNERS_PLUS2, g_fvarInterp==SdcOptions::FVAR_LINEAR_CORNERS_PLUS2);
-    g_hud.AddPullDownButton(fvar_interp_pulldown, "Boundaries (always sharp)",
-        SdcOptions::FVAR_LINEAR_BOUNDARIES, g_fvarInterp==SdcOptions::FVAR_LINEAR_BOUNDARIES);
-    g_hud.AddPullDownButton(fvar_interp_pulldown, "All (bilinear)",
-        SdcOptions::FVAR_LINEAR_ALL, g_fvarInterp==SdcOptions::FVAR_LINEAR_ALL);
+    int boundary_pulldown = g_hud.AddPullDown("Boundary (B)", 10, 10, 250, callbackBoundary, 'b');
+    g_hud.AddPullDownButton(boundary_pulldown, "None (edge only)",
+        SdcOptions::FVAR_LINEAR_NONE, g_fvarBoundary==SdcOptions::FVAR_LINEAR_NONE);
+    g_hud.AddPullDownButton(boundary_pulldown, "Corners Only",
+        SdcOptions::FVAR_LINEAR_CORNERS_ONLY, g_fvarBoundary==SdcOptions::FVAR_LINEAR_CORNERS_ONLY);
+    g_hud.AddPullDownButton(boundary_pulldown, "Corners 1 (edge corner)",
+        SdcOptions::FVAR_LINEAR_CORNERS_PLUS1, g_fvarBoundary==SdcOptions::FVAR_LINEAR_CORNERS_PLUS1);
+    g_hud.AddPullDownButton(boundary_pulldown, "Corners 2 (edge corner prop)",
+        SdcOptions::FVAR_LINEAR_CORNERS_PLUS2, g_fvarBoundary==SdcOptions::FVAR_LINEAR_CORNERS_PLUS2);
+    g_hud.AddPullDownButton(boundary_pulldown, "Boundaries (always sharp)",
+        SdcOptions::FVAR_LINEAR_BOUNDARIES, g_fvarBoundary==SdcOptions::FVAR_LINEAR_BOUNDARIES);
+    g_hud.AddPullDownButton(boundary_pulldown, "All (bilinear)",
+        SdcOptions::FVAR_LINEAR_ALL, g_fvarBoundary==SdcOptions::FVAR_LINEAR_ALL);
 
     int pulldown_handle = g_hud.AddPullDown("Shape (N)", -300, 10, 300, callbackModel, 'n');
     for (int i = 0; i < (int)g_defaultShapes.size(); ++i) {
@@ -1248,20 +1046,20 @@ initGL() {
 static void
 idle() {
 
-    if (! g_freeze)
+    if (not g_freeze)
         g_frame++;
 
     updateGeom();
 
-    if (g_repeatCount != 0 && g_frame >= g_repeatCount)
+    if (g_repeatCount != 0 and g_frame >= g_repeatCount)
         g_running = 0;
 }
 
 //------------------------------------------------------------------------------
 static void
 callbackError(OpenSubdiv::Far::ErrorType err, const char *message) {
-    printf("OpenSubdiv Error: %d\n", err);
-    printf("    %s\n", message);
+    printf("Error: %d\n", err);
+    printf("%s", message);
 }
 
 //------------------------------------------------------------------------------
@@ -1273,24 +1071,33 @@ callbackErrorGLFW(int error, const char* description) {
 //------------------------------------------------------------------------------
 int main(int argc, char ** argv) {
 
-    ArgOptions args;
-        
-    args.Parse(argc, argv);
-    args.PrintUnrecognizedArgsWarnings();
-
-    g_yup = args.GetYUp();
-    g_adaptive = args.GetAdaptive();
-    g_level = args.GetLevel();
-    g_repeatCount = args.GetRepeatCount();
-
-    ViewerArgsUtils::PopulateShapes(args, &g_defaultShapes);
+    bool fullscreen = false;
+    std::string str;
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "-d"))
+            g_level = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "-c"))
+            g_repeatCount = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "-f"))
+            fullscreen = true;
+        else {
+            std::ifstream ifs(argv[1]);
+            if (ifs) {
+                std::stringstream ss;
+                ss << ifs.rdbuf();
+                ifs.close();
+                str = ss.str();
+                g_defaultShapes.push_back(ShapeDesc(argv[1], str.c_str(), kCatmark));
+            }
+        }
+    }
 
     initShapes();
 
     OpenSubdiv::Far::SetErrorCallback(callbackError);
 
     glfwSetErrorCallback(callbackErrorGLFW);
-    if (! glfwInit()) {
+    if (not glfwInit()) {
         printf("Failed to initialize GLFW\n");
         return 1;
     }
@@ -1299,12 +1106,12 @@ int main(int argc, char ** argv) {
 
     GLUtils::SetMinimumGLVersion();
 
-    if (args.GetFullScreen()) {
+    if (fullscreen) {
         g_primary = glfwGetPrimaryMonitor();
 
         // apparently glfwGetPrimaryMonitor fails under linux : if no primary,
         // settle for the first one in the list
-        if (! g_primary) {
+        if (not g_primary) {
             int count = 0;
             GLFWmonitor ** monitors = glfwGetMonitors(&count);
 
@@ -1319,16 +1126,14 @@ int main(int argc, char ** argv) {
         }
     }
 
-    if (! (g_window=glfwCreateWindow(g_width, g_height, windowTitle,
-             args.GetFullScreen() && g_primary ? g_primary : NULL, NULL))) {
+    if (not (g_window=glfwCreateWindow(g_width, g_height, windowTitle,
+                                       fullscreen and g_primary ? g_primary : NULL, NULL))) {
         std::cerr << "Failed to create OpenGL context.\n";
         glfwTerminate();
         return 1;
     }
 
     glfwMakeContextCurrent(g_window);
-
-    GLUtils::InitializeGL();
     GLUtils::PrintGLVersion();
 
     // accommodate high DPI displays (e.g. mac retina displays)
@@ -1340,7 +1145,21 @@ int main(int argc, char ** argv) {
     glfwSetMouseButtonCallback(g_window, mouse);
     glfwSetWindowCloseCallback(g_window, windowClose);
 
-    g_adaptive = g_adaptive && GLUtils::SupportsAdaptiveTessellation();
+
+#if defined(OSD_USES_GLEW)
+#ifdef CORE_PROFILE
+    // this is the only way to initialize glew correctly under core profile context.
+    glewExperimental = true;
+#endif
+    if (GLenum r = glewInit() != GLEW_OK) {
+        printf("Failed to initialize glew. Error = %s\n", glewGetErrorString(r));
+        exit(1);
+    }
+#ifdef CORE_PROFILE
+    // clear GL errors which was generated during glewInit()
+    glGetError();
+#endif
+#endif
 
     initGL();
     linkDefaultProgram();

@@ -177,7 +177,7 @@ Refinement::refine(Options refineOptions) {
 
 
 //
-//  Methods to construct the parent-to-child mapping
+//  Methods for construct the parent-to-child mapping
 //
 void
 Refinement::populateParentToChildMapping() {
@@ -227,7 +227,7 @@ Refinement::populateParentChildIndices() {
 
     //
     //  Two vertex orderings are currently supported -- ordering vertices refined
-    //  from vertices first, or those refined from faces first.  It's possible this
+    //  from vertices first, or those refined from faces first.  Its possible this
     //  may be extended to more possibilities.  Once the ordering is defined here,
     //  other than analogous initialization in FVarRefinement, the treatment of
     //  vertices in blocks based on origin should make the rest of the code
@@ -753,9 +753,6 @@ Refinement::populateVertexTagsFromParentEdges() {
         vTag._nonManifold    = pEdgeTag._nonManifold;
         vTag._boundary       = pEdgeTag._boundary;
         vTag._semiSharpEdges = pEdgeTag._semiSharp;
-        vTag._infSharpEdges  = pEdgeTag._infSharp;
-        vTag._infSharpCrease = pEdgeTag._infSharp;
-        vTag._infIrregular   = pEdgeTag._infSharp && pEdgeTag._nonManifold;
 
         vTag._rule = (Level::VTag::VTagSize)((pEdgeTag._semiSharp || pEdgeTag._infSharp)
                        ? Sdc::Crease::RULE_CREASE : Sdc::Crease::RULE_SMOOTH);
@@ -773,7 +770,6 @@ Refinement::populateVertexTagsFromParentVertices() {
     Index cVertEnd = cVert + getNumChildVerticesFromVertices();
     for ( ; cVert < cVertEnd; ++cVert) {
         _child->_vertTags[cVert] = _parent->_vertTags[_childVertexParentIndex[cVert]];
-        _child->_vertTags[cVert]._incidIrregFace = 0;
     }
 }
 
@@ -815,7 +811,7 @@ Refinement::subdivideTopology(Relations const& applyTo) {
     //  than the parent if that maximal parent vertex was not included in the sparse
     //  refinement (possible when sparse refinement is more general).
     //      - it may also be more if the base level was fairly trivial, i.e. less
-    //  than the regular valence, or contains non-manifold edges with many faces.
+    //  than the regular valence.
     //      - NOTE that when/if we support N-gons for tri-splitting, that the valence
     //  of edge-vertices introduced on the N-gon may be 7 rather than 6, while N may
     //  be less than both.
@@ -824,13 +820,9 @@ Refinement::subdivideTopology(Relations const& applyTo) {
     //  each topology relation is independent/optional complicates the issue of 
     //  where to keep track of it...
     //
-    if (_splitType == Sdc::SPLIT_TO_QUADS) {
-        _child->_maxValence = std::max(_parent->_maxValence, 4);
-        _child->_maxValence = std::max(_child->_maxValence, 2 + _parent->_maxEdgeFaces);
-    } else {
-        _child->_maxValence = std::max(_parent->_maxValence, 6);
-        _child->_maxValence = std::max(_child->_maxValence, 2 + _parent->_maxEdgeFaces * 2);
-    }
+    int maxRegularValence = (_splitType == Sdc::SPLIT_TO_QUADS) ? 4 : 6;
+
+    _child->_maxValence = std::max(_parent->_maxValence, maxRegularValence);
 }
 
 
@@ -915,7 +907,7 @@ Refinement::subdivideEdgeSharpness() {
                 cSharpness = creasing.SubdivideEdgeSharpnessAtVertex(pSharpness, pVertEdges.size(),
                                                                          pVertEdgeSharpness);
             }
-            if (! Sdc::Crease::IsSharp(cSharpness)) {
+            if (not Sdc::Crease::IsSharp(cSharpness)) {
                 cEdgeTag._semiSharp = false;
             }
         }
@@ -949,7 +941,7 @@ Refinement::subdivideVertexSharpness() {
             float pSharpness = _parent->_vertSharpness[pVert];
 
             cSharpness = creasing.SubdivideVertexSharpness(pSharpness);
-            if (! Sdc::Crease::IsSharp(cSharpness)) {
+            if (not Sdc::Crease::IsSharp(cSharpness)) {
                 cVertTag._semiSharp = false;
             }
         }

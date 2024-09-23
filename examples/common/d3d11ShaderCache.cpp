@@ -27,7 +27,7 @@
 #include <D3D11.h>
 #include <D3Dcompiler.h>
 
-#include <opensubdiv/far/error.h>
+#include <far/error.h>
 
 D3D11DrawConfig::D3D11DrawConfig()
     : _vertexShader(NULL), _hullShader(NULL), _domainShader(NULL),
@@ -90,7 +90,7 @@ D3D11DrawConfig::CompileVertexShader(const std::string &target,
         return false;
     }
 
-    if (ppInputLayout && !*ppInputLayout) {
+    if (ppInputLayout and !*ppInputLayout) {
         hr = pd3dDevice->CreateInputLayout(
             pInputElementDescs, numInputElements,
             pBlob->GetBufferPointer(),

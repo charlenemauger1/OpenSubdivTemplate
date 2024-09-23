@@ -92,17 +92,22 @@ PtexIndices::GetAdjacency(
     int face, int quadrant,
     int adjFaces[4], int adjEdges[4]) const {
 
-    int regFaceSize =
-        Sdc::SchemeTypeTraits::GetRegularFaceSize(refiner.GetSchemeType());
+    if (Sdc::SchemeTypeTraits::GetRegularFaceSize(
+            refiner.GetSchemeType()) != 4) {
+        Far::Error(FAR_RUNTIME_ERROR,
+                "Failure in PtexIndices::GetAdjacency() -- "
+                "currently only implemented for quad schemes.");
+        return;
+    }
 
     Vtr::internal::Level const & level = refiner.getLevel(0);
 
     ConstIndexArray fedges = level.getFaceEdges(face);
 
-    if (fedges.size() == regFaceSize) {
+    if (fedges.size()==4) {
 
         // Regular ptex quad face
-        for (int i=0; i<regFaceSize; ++i) {
+        for (int i=0; i<4; ++i) {
             int edge = fedges[i];
             Index adjface = getAdjacentFace(level, edge, face);
             if (adjface==-1) {
@@ -111,9 +116,9 @@ PtexIndices::GetAdjacency(
             } else {
 
                 ConstIndexArray aedges = level.getFaceEdges(adjface);
-                if (aedges.size()==regFaceSize) {
+                if (aedges.size()==4) {
                     adjFaces[i] = _ptexIndices[adjface];
-                    adjEdges[i] = aedges.FindIndex(edge);
+                    adjEdges[i] = aedges.FindIndexIn4Tuple(edge);
                     assert(adjEdges[i]!=-1);
                 } else {
                     // neighbor is a sub-face
@@ -124,11 +129,7 @@ PtexIndices::GetAdjacency(
                 assert(adjFaces[i]!=-1);
             }
         }
-        if (regFaceSize == 3) {
-            adjFaces[3] = -1;
-            adjEdges[3] = 0;
-        }
-    } else if (regFaceSize == 4) {
+    } else {
 
         //  Ptex sub-face 'quadrant' (non-quad)
         //
@@ -149,7 +150,7 @@ PtexIndices::GetAdjacency(
         //  o----------o----------o
         // v0                     v1
         */
-        assert(quadrant>=0 && quadrant<fedges.size());
+        assert(quadrant>=0 and quadrant<fedges.size());
 
         int nextQuadrant = (quadrant+1) % fedges.size(),
             prevQuadrant = (quadrant+fedges.size()-1) % fedges.size();
@@ -162,7 +163,7 @@ PtexIndices::GetAdjacency(
             adjEdges[2] = 1;
         }
 
-        {   // resolve neighbor outside the sub-face (edge 0)
+        {   // resolve neighbor outisde the sub-face (edge 0)
             int edge0 = fedges[quadrant];
             Index adjface0 = getAdjacentFace(level, edge0, face);
             if (adjface0==-1) {
@@ -181,7 +182,7 @@ PtexIndices::GetAdjacency(
                 assert(adjFaces[0]!=-1);
             }
 
-            // resolve neighbor outside the sub-face (edge 3)
+            // resolve neighbor outisde the sub-face (edge 3)
             int edge3 = fedges[prevQuadrant];
             Index adjface3 = getAdjacentFace(level, edge3, face);
             if (adjface3==-1) {
@@ -200,10 +201,6 @@ PtexIndices::GetAdjacency(
                 assert(adjFaces[3]!=-1);
             }
         }
-    } else {
-        Far::Error(FAR_RUNTIME_ERROR,
-                "Failure in PtexIndices::GetAdjacency() -- "
-                "irregular faces only supported for quad schemes.");
     }
 }
 

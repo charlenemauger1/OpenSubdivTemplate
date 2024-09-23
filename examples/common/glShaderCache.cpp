@@ -22,13 +22,12 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
-
 #include "glShaderCache.h"
 #include "glUtils.h"
 
 #include <vector>
-#include <opensubdiv/far/error.h>
+#include <osd/opengl.h>
+#include <far/error.h>
 
 GLDrawConfig::GLDrawConfig(const std::string &version)
     : _version(version), _numShaders(0) {

@@ -35,8 +35,7 @@ SYNOPSIS
 .. parsed-literal::
    :class: codefhead
 
-   **glEvalLimit** [**-f**] [**-yup**] [**-u**] [**-a**] [**-l** *refinement level*]
-       *objfile(s)* [**-catmark**] [**-loop**] [**-bilinear**]
+   **limitEval** [**-f**] *objfile(s)*
 
 DESCRIPTION
 ===========
@@ -76,8 +75,8 @@ Multiple controls are available to experiment with the algorithms.
 OPTIONS
 =======
 
-See the description of the
-`common comand line options <code_examples.html#common-command-line-options>`__
-for the subset of common options supported here.
+**-f**
+  Launches the application in full-screen mode (if is supported by GLFW on the
+  OS)
 
 .. include:: examples_see_also.rst

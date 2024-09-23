@@ -35,9 +35,9 @@ SYNOPSIS
 .. parsed-literal:: 
    :class: codefhead
 
-   **glPaintTest** [**-f**] [**-yup**] [**-l** *adaptive refinement level*] 
-       *objfile(s)* [**-catmark**] [**-loop**]
-
+   **glPaintTest** 
+   [**-f**] 
+   *objfile(s)*
    
 DESCRIPTION
 ===========
@@ -53,11 +53,16 @@ using GPU limit tessellation for painting and sculpting applications.
 OPTIONS
 =======
 
-See the description of the
-`common comand line options <code_examples.html#common-command-line-options>`__
-for the subset of common options supported here.
+**-f**
+  Launches the application in full-screen mode (if is supported by GLFW on the
+  OS)
 
-KEYBOARD CONTROLS
+*objfile(s)*
+  A sequence of obj files used as an animation loop (the topology has to match
+  the data contained in all the ptex files !)
+
+
+Keyboard Controls
 =================
 
    .. code:: c++

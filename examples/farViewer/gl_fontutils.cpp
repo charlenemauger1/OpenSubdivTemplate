@@ -22,8 +22,6 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
-
 #include "gl_fontutils.h"
 
 #include <cassert>
@@ -67,7 +65,7 @@ void GLFont::bindProgram() {
 #include "fontShader.gen.h"
 ;
     // Update and bind transform state
-    if (! _program) {
+    if (not _program) {
 
         _program = glCreateProgram();
 
@@ -108,15 +106,15 @@ void GLFont::bindProgram() {
     }
     glUseProgram(_program);
 
-    if (! _scale) {
+    if (not _scale) {
         _scale = glGetUniformLocation(_program, "scale");
     }
 
-    if (! _attrPosition) {
+    if (not _attrPosition) {
         _attrPosition = glGetAttribLocation(_program, "position");
     }
 
-    if (! _attrData) {
+    if (not _attrData) {
         _attrData = glGetAttribLocation(_program, "data");
     }
 }
@@ -165,13 +163,13 @@ void GLFont::Draw(GLuint transformUB) {
         return;
     }
 
-    assert(_VAO && _VBO);
+    assert(_VAO and _VBO);
 
     glBindVertexArray(_VAO);
 
     bindProgram();
 
-    if (! _transformBinding) {
+    if (not _transformBinding) {
 
         GLuint uboIndex = glGetUniformBlockIndex(_program, "Transform");
         if (uboIndex != GL_INVALID_INDEX)

@@ -22,63 +22,61 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
+#include "../common/glUtils.h"
 
 #include <GLFW/glfw3.h>
 GLFWwindow* g_window=0;
 GLFWmonitor* g_primary=0;
 
-#include <opensubdiv/far/error.h>
-#include <opensubdiv/far/stencilTable.h>
-#include <opensubdiv/far/ptexIndices.h>
+#include <far/error.h>
+#include <far/stencilTable.h>
+#include <far/ptexIndices.h>
 
-#include <opensubdiv/osd/mesh.h>
-#include <opensubdiv/osd/glVertexBuffer.h>
-#include <opensubdiv/osd/cpuGLVertexBuffer.h>
-#include <opensubdiv/osd/cpuEvaluator.h>
+#include <osd/mesh.h>
+#include <osd/glVertexBuffer.h>
+#include <osd/cpuGLVertexBuffer.h>
+#include <osd/cpuEvaluator.h>
 
 #ifdef OPENSUBDIV_HAS_OPENMP
-    #include <opensubdiv/osd/ompEvaluator.h>
+    #include <osd/ompEvaluator.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_TBB
-    #include <opensubdiv/osd/tbbEvaluator.h>
+    #include <osd/tbbEvaluator.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_OPENCL
-    #include <opensubdiv/osd/clGLVertexBuffer.h>
-    #include <opensubdiv/osd/clEvaluator.h>
+    #include <osd/clGLVertexBuffer.h>
+    #include <osd/clEvaluator.h>
     #include "../common/clDeviceContext.h"
     CLDeviceContext g_clDeviceContext;
 #endif
 
 #ifdef OPENSUBDIV_HAS_CUDA
-    #include <opensubdiv/osd/cudaGLVertexBuffer.h>
-    #include <opensubdiv/osd/cudaEvaluator.h>
+    #include <osd/cudaGLVertexBuffer.h>
+    #include <osd/cudaEvaluator.h>
     #include "../common/cudaDeviceContext.h"
     CudaDeviceContext g_cudaDeviceContext;
 #endif
 
 #ifdef OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK
-    #include <opensubdiv/osd/glXFBEvaluator.h>
+    #include <osd/glXFBEvaluator.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_GLSL_COMPUTE
-    #include <opensubdiv/osd/glComputeEvaluator.h>
+    #include <osd/glComputeEvaluator.h>
 #endif
 
 
 #include "../../regression/common/far_utils.h"
 #include "init_shapes.h"
 
-#include "../../regression/common/arg_utils.h"
 #include "../common/stopwatch.h"
 #include "../common/simple_math.h"
 #include "../common/glHud.h"
 #include "../common/glShaderCache.h"
-#include "../common/glUtils.h"
 
-#include <opensubdiv/osd/glslPatchShaderSource.h>
+#include <osd/glslPatchShaderSource.h>
 static const char *shaderSource =
 #include "shader.gen.h"
 ;
@@ -148,7 +146,7 @@ float g_cpuTime = 0;
 float g_gpuTime = 0;
 Stopwatch g_fpsTimer;
 
-int g_level = 2;
+int g_level = 1;
 int g_tessLevel = 1;
 int g_tessLevelMin = 1;
 int g_frame = 0;
@@ -374,10 +372,6 @@ public:
             ss << "#define OSD_PATCH_GREGORY_BOUNDARY\n";
         } else if (type == Far::PatchDescriptor::GREGORY_BASIS) {
             ss << "#define OSD_PATCH_GREGORY_BASIS\n";
-        } else if (type == Far::PatchDescriptor::LOOP) {
-            ss << "#define OSD_PATCH_LOOP\n";
-        } else if (type == Far::PatchDescriptor::GREGORY_TRIANGLE) {
-            ss << "#define OSD_PATCH_GREGORY_TRIANGLE\n";
         }
 
         // for legacy gregory
@@ -641,7 +635,7 @@ display() {
 
     glEnable(GL_DEPTH_TEST);
 
-    // make sure that the vertex buffer is interoped back as a GL resource.
+    // make sure that the vertex buffer is interoped back as a GL resources.
     g_scene->BindVertexBuffer();
 
     glBindVertexArray(g_vao);
@@ -792,7 +786,7 @@ motion(GLFWwindow *, double dx, double dy) {
         // pan
         g_pan[0] -= g_dolly*(x - g_prev_x)/g_width;
         g_pan[1] += g_dolly*(y - g_prev_y)/g_height;
-    } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) ||
+    } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) or
                (!g_mbutton[0] && g_mbutton[1] && !g_mbutton[2])) {
         // dolly
         g_dolly -= g_dolly*0.01f*(x - g_prev_x);
@@ -929,9 +923,12 @@ rebuildTopology() {
     }
 
     for (int i = 0; i < (int)g_defaultShapes.size(); ++i) {
-        Shape const * shape = Shape::parseObj(g_defaultShapes[i]);
+        Shape const * shape = Shape::parseObj(
+            g_defaultShapes[i].data.c_str(),
+            g_defaultShapes[i].scheme,
+            g_defaultShapes[i].isLeftHanded);
 
-        bool varying = (g_displayStyle==kVarying || g_displayStyle==kVaryingInterleaved);
+        bool varying = (g_displayStyle==kVarying or g_displayStyle==kVaryingInterleaved);
         g_scene->AddTopology(shape, g_level, varying);
 
         delete shape;
@@ -981,7 +978,7 @@ callbackKernel(int k) {
     g_kernel = k;
 
 #ifdef OPENSUBDIV_HAS_OPENCL
-    if (g_kernel == kCL && (!g_clDeviceContext.IsInitialized())) {
+    if (g_kernel == kCL and (not g_clDeviceContext.IsInitialized())) {
         if (g_clDeviceContext.Initialize() == false) {
             printf("Error in initializing OpenCL\n");
             exit(1);
@@ -990,7 +987,7 @@ callbackKernel(int k) {
 #endif
 
 #ifdef OPENSUBDIV_HAS_CUDA
-    if (g_kernel == kCUDA && (!g_cudaDeviceContext.IsInitialized())) {
+    if (g_kernel == kCUDA and (not g_cudaDeviceContext.IsInitialized())) {
         if (g_cudaDeviceContext.Initialize() == false) {
             printf("Error in initializing Cuda\n");
             exit(1);
@@ -1091,7 +1088,8 @@ initHUD() {
     g_hud.AddPullDownButton(compute_pulldown, "GLSL TransformFeedback", kGLSL);
 #endif
 #ifdef OPENSUBDIV_HAS_GLSL_COMPUTE
-    if (GLUtils::GL_ARBComputeShaderOrGL_VERSION_4_3()) {
+    // Must also check at run time for OpenGL 4.3
+    if (GLEW_VERSION_4_3) {
         g_hud.AddPullDownButton(compute_pulldown, "GLSL Compute", kGLSLCompute);
     }
 #endif
@@ -1109,10 +1107,10 @@ initHUD() {
 
         int endcap_pulldown = g_hud.AddPullDown(
             "End cap (E)", 10, 210, 200, callbackEndCap, 'e');
-        g_hud.AddPullDownButton(endcap_pulldown, "Regular",
+        g_hud.AddPullDownButton(endcap_pulldown, "BSpline",
                                 SceneBase::kEndCapBSplineBasis,
                                 g_options.endCap == SceneBase::kEndCapBSplineBasis);
-        g_hud.AddPullDownButton(endcap_pulldown, "Gregory",
+        g_hud.AddPullDownButton(endcap_pulldown, "GregoryBasis",
                                 SceneBase::kEndCapGregoryBasis,
                                 g_options.endCap == SceneBase::kEndCapGregoryBasis);
     }
@@ -1121,7 +1119,7 @@ initHUD() {
     for (int i = 1; i < 11; ++i) {
         char level[16];
         sprintf(level, "Lv. %d", i);
-        g_hud.AddRadioButton(3, level, i==g_level, 10, 210+i*20, callbackLevel, i, '0'+(i%10));
+        g_hud.AddRadioButton(3, level, i==2, 10, 210+i*20, callbackLevel, i, '0'+(i%10));
     }
 
     g_hud.Rebuild(windowWidth, windowHeight, frameBufferWidth, frameBufferHeight);
@@ -1145,7 +1143,7 @@ initGL() {
 //------------------------------------------------------------------------------
 static void
 idle() {
-    if (! g_freeze) {
+    if (not g_freeze) {
         ++g_frame;
         updateGeom();
         refine();
@@ -1155,8 +1153,8 @@ idle() {
 //------------------------------------------------------------------------------
 static void
 callbackError(Far::ErrorType err, const char *message) {
-    printf("OpenSubdiv Error: %d\n", err);
-    printf("    %s\n", message);
+    printf("Error: %d\n", err);
+    printf("%s", message);
 }
 
 //------------------------------------------------------------------------------
@@ -1168,18 +1166,16 @@ callbackErrorGLFW(int error, const char* description) {
 
 int main(int argc, char ** argv) {
 
-    ArgOptions args;
-
-    args.Parse(argc, argv);
-    args.PrintUnrecognizedArgsWarnings();
-
-    g_options.adaptive = args.GetAdaptive();
-    g_level = args.GetLevel();
-
+    std::string str;
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "-d")) {
+            g_level = atoi(argv[++i]);
+        }
+    }
     Far::SetErrorCallback(callbackError);
 
     glfwSetErrorCallback(callbackErrorGLFW);
-    if (! glfwInit()) {
+    if (not glfwInit()) {
         printf("Failed to initialize GLFW\n");
         return 1;
     }
@@ -1188,18 +1184,16 @@ int main(int argc, char ** argv) {
 
     GLUtils::SetMinimumGLVersion();
 
-    if (! (g_window=glfwCreateWindow(g_width, g_height, windowTitle, NULL, NULL))) {
+    if (not (g_window=glfwCreateWindow(g_width, g_height, windowTitle, NULL, NULL))) {
         std::cerr << "Failed to create OpenGL context.\n";
         glfwTerminate();
         return 1;
     }
 
     glfwMakeContextCurrent(g_window);
-
-    GLUtils::InitializeGL();
     GLUtils::PrintGLVersion();
 
-    // accommodate high DPI displays (e.g. mac retina displays)
+    // accommocate high DPI displays (e.g. mac retina displays)
     glfwGetFramebufferSize(g_window, &g_width, &g_height);
     glfwSetFramebufferSizeCallback(g_window, reshape);
 
@@ -1207,6 +1201,24 @@ int main(int argc, char ** argv) {
     glfwSetCursorPosCallback(g_window, motion);
     glfwSetMouseButtonCallback(g_window, mouse);
     glfwSetWindowCloseCallback(g_window, windowClose);
+
+#if defined(OSD_USES_GLEW)
+#ifdef CORE_PROFILE
+    // this is the only way to initialize glew correctly under core profile context.
+    glewExperimental = true;
+#endif
+    if (GLenum r = glewInit() != GLEW_OK) {
+        printf("Failed to initialize glew. Error = %s\n", glewGetErrorString(r));
+        exit(1);
+    }
+#ifdef CORE_PROFILE
+    // clear GL errors which was generated during glewInit()
+    glGetError();
+#endif
+#endif
+
+    // activate feature adaptive tessellation if OSD supports it
+    g_options.adaptive = true;
 
     initShapes();
     initGL();

@@ -63,24 +63,13 @@ elseif (APPLE)
             "$ENV{PTEX_LOCATION}/include"
         PATHS
             DOC "The directory where Ptexture.h resides")
-    if (IOS)
-        #IOS needs to link with the static version of ptex
-        find_library( PTEX_LIBRARY
-            NAMES
-                libPtex.a
-            PATHS
-                "${PTEX_LOCATION}/lib"
-                "$ENV{PTEX_LOCATION}/lib"
-                DOC "The Ptex Library")
-    else ()
-        find_library( PTEX_LIBRARY
-            NAMES
-                Ptex libPtex.a
-            PATHS
-                "${PTEX_LOCATION}/lib"
-                "$ENV{PTEX_LOCATION}/lib"
-                DOC "The Ptex Library")
-    endif()
+    find_library( PTEX_LIBRARY
+        NAMES
+            Ptex libPtex.a
+        PATHS
+            "${PTEX_LOCATION}/lib"
+            "$ENV{PTEX_LOCATION}/lib"
+            DOC "The Ptex Library")
 else ()
     find_path( PTEX_INCLUDE_DIR
         NAMES
@@ -112,21 +101,15 @@ else ()
             DOC "The Ptex library")
 endif ()
 
-if (PTEX_INCLUDE_DIR AND EXISTS "${PTEX_INCLUDE_DIR}/PtexVersion.h")
-    set (PTEX_VERSION_FILE "${PTEX_INCLUDE_DIR}/PtexVersion.h")
-elseif (PTEX_INCLUDE_DIR AND EXISTS "${PTEX_INCLUDE_DIR}/Ptexture.h")    
-    set (PTEX_VERSION_FILE "${PTEX_INCLUDE_DIR}/Ptexture.h")
-endif()
+if (PTEX_INCLUDE_DIR AND EXISTS "${PTEX_INCLUDE_DIR}/Ptexture.h" )
 
-if (PTEX_VERSION_FILE)
-
-    file(STRINGS "${PTEX_VERSION_FILE}" TMP REGEX "^#define PtexAPIVersion.*$")
+    file(STRINGS "${PTEX_INCLUDE_DIR}/Ptexture.h" TMP REGEX "^#define PtexAPIVersion.*$")
     string(REGEX MATCHALL "[0-9]+" API ${TMP})
     
-    file(STRINGS "${PTEX_VERSION_FILE}" TMP REGEX "^#define PtexFileMajorVersion.*$")
+    file(STRINGS "${PTEX_INCLUDE_DIR}/Ptexture.h" TMP REGEX "^#define PtexFileMajorVersion.*$")
     string(REGEX MATCHALL "[0-9]+" MAJOR ${TMP})
 
-    file(STRINGS "${PTEX_VERSION_FILE}" TMP REGEX "^#define PtexFileMinorVersion.*$")
+    file(STRINGS "${PTEX_INCLUDE_DIR}/Ptexture.h" TMP REGEX "^#define PtexFileMinorVersion.*$")
     string(REGEX MATCHALL "[0-9]+" MINOR ${TMP})
 
     set(PTEX_VERSION ${API}.${MAJOR}.${MINOR})

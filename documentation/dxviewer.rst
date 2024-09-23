@@ -35,8 +35,7 @@ SYNOPSIS
 .. parsed-literal:: 
    :class: codefhead
 
-   **dxViewer** [**-f**] [**-yup**] [**-u**] [**-a**] [**-l** *refinement level*] [**-c** *animation loops*]
-      *objfile(s)* [**-catmark**] [**-loop**] [**-bilinear**]
+   **dxViewer** [**-d** *isolation level*] [**-c** *animation loops*]  *objfile(s)*
 
 DESCRIPTION
 ===========
@@ -50,11 +49,22 @@ shapes. Multiple controls are available to experiment with the algorithms.
    :align: center
    :target: images/dxviewer.png 
 
+.. container:: notebox
+
+   * **Note:** 
+     
+      dxViewer requires Microsoft's DirectX D3D11 SDK
+
 OPTIONS
 =======
 
-See the description of the
-`common comand line options <code_examples.html#common-command-line-options>`__
-for the subset of common options supported here.
+**-d** *isolation level*
+  Select the desired isolation level of adaptive feature isolation. This can be 
+  useful when trying to load large pieces of geometry.
+
+**-c** *animation frequency*
+  Number of repetitions of the animation loop (default=0 is infinite)
+
+
 
 .. include:: examples_see_also.rst

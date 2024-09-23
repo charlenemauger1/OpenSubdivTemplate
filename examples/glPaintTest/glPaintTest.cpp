@@ -22,31 +22,29 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
+
+#include "../common/glUtils.h"
 
 #include <GLFW/glfw3.h>
 GLFWwindow* g_window=0;
 GLFWmonitor* g_primary=0;
 
-#include <opensubdiv/far/error.h>
-#include <opensubdiv/far/ptexIndices.h>
-#include <opensubdiv/osd/cpuEvaluator.h>
-#include <opensubdiv/osd/cpuGLVertexBuffer.h>
-#include <opensubdiv/osd/glMesh.h>
+#include <far/error.h>
+#include <far/ptexIndices.h>
+#include <osd/cpuEvaluator.h>
+#include <osd/cpuGLVertexBuffer.h>
+#include <osd/glMesh.h>
 OpenSubdiv::Osd::GLMeshInterface *g_mesh;
 
 #include "../../regression/common/far_utils.h"
-#include "../../regression/common/arg_utils.h"
-#include "../common/viewerArgsUtils.h"
 #include "../common/stopwatch.h"
 #include "../common/simple_math.h"
 #include "../common/glHud.h"
 #include "../common/glShaderCache.h"
-#include "../common/glUtils.h"
 
 #include "init_shapes.h"
 
-#include <opensubdiv/osd/glslPatchShaderSource.h>
+#include <osd/glslPatchShaderSource.h>
 static const char *shaderSource =
 #include "shader.gen.h"
 ;
@@ -65,8 +63,6 @@ float g_rotate[2] = {0, 0},
       g_pan[2] = {0, 0},
       g_center[3] = {0, 0, 0},
       g_size = 0;
-
-bool  g_yup = false;
 
 int   g_prev_x = 0,
       g_prev_y = 0;
@@ -109,7 +105,7 @@ int g_running = 1,
     g_displayDisplacement = 0,
     g_mbutton[3] = {0, 0, 0};
 
-int g_brushSize = 100;
+int g_brushSize = 500;
 int g_frame = 0;
 
 GLuint g_ptexPages = 0,
@@ -117,6 +113,16 @@ GLuint g_ptexPages = 0,
     g_ptexTexels = 0;
 
 int g_pageSize = 512;
+
+struct SimpleShape {
+    std::string  name;
+    Scheme       scheme;
+    std::string  data;
+
+    SimpleShape() { }
+    SimpleShape( std::string const & idata, char const * iname, Scheme ischeme )
+        : name(iname), scheme(ischeme), data(idata) { }
+};
 
 int g_currentShape = 0;
 
@@ -191,7 +197,7 @@ createOsdMesh() {
 
     ShapeDesc const & shapeDesc = g_defaultShapes[g_currentShape];
 
-    Shape * shape = Shape::parseObj(shapeDesc);
+    Shape * shape = Shape::parseObj(shapeDesc.data.c_str(), shapeDesc.scheme);
 
     checkGLErrors("create osd enter");
 
@@ -200,9 +206,6 @@ createOsdMesh() {
     // create Far mesh (topology)
     OpenSubdiv::Sdc::SchemeType sdctype = GetSdcType(*shape);
     OpenSubdiv::Sdc::Options sdcoptions = GetSdcOptions(*shape);
-
-    // Recall this application should not accept or include Bilinear shapes
-    assert(sdctype != OpenSubdiv::Sdc::SCHEME_BILINEAR);
 
     OpenSubdiv::Far::TopologyRefiner * refiner =
         OpenSubdiv::Far::TopologyRefinerFactory<Shape>::Create(*shape,
@@ -218,7 +221,6 @@ createOsdMesh() {
     bool doAdaptive = true;
     OpenSubdiv::Osd::MeshBitset bits;
     bits.set(OpenSubdiv::Osd::MeshAdaptive, doAdaptive);
-    bits.set(OpenSubdiv::Osd::MeshEndCapGregoryBasis, true);
 
     g_mesh = new OpenSubdiv::Osd::Mesh<OpenSubdiv::Osd::CpuGLVertexBuffer,
                                        OpenSubdiv::Far::StencilTable,
@@ -622,9 +624,7 @@ display() {
     translate(g_transformData.ModelViewMatrix, -g_pan[0], -g_pan[1], -g_dolly);
     rotate(g_transformData.ModelViewMatrix, g_rotate[1], 1, 0, 0);
     rotate(g_transformData.ModelViewMatrix, g_rotate[0], 0, 1, 0);
-    if (!g_yup) {
-        rotate(g_transformData.ModelViewMatrix, -90, 1, 0, 0);
-    }
+    rotate(g_transformData.ModelViewMatrix, -90, 1, 0, 0);
     translate(g_transformData.ModelViewMatrix,
               -g_center[0], -g_center[1], -g_center[2]);
     perspective(g_transformData.ProjectionMatrix,
@@ -648,7 +648,7 @@ display() {
 
     bindTextures(effect);
 
-    // make sure that the vertex buffer is interoped back as a GL resource.
+    // make sure that the vertex buffer is interoped back as a GL resources.
     g_mesh->BindVertexBuffer();
 
     glBindVertexArray(g_vao);
@@ -694,7 +694,7 @@ display() {
         g_fpsTimer.Stop();
         double fps = 1.0/g_fpsTimer.GetElapsed();
         g_fpsTimer.Start();
-        // Average fps over a defined number of time samples for
+        // Avereage fps over a defined number of time samples for
         // easier reading in the HUD
         g_fpsTimeSamples[g_currentFpsTimeSample++] = float(fps);
         if (g_currentFpsTimeSample >= NUM_FPS_TIME_SAMPLES)
@@ -704,16 +704,16 @@ display() {
             averageFps += g_fpsTimeSamples[i]/(float)NUM_FPS_TIME_SAMPLES;
         }
 
-        g_hud.DrawString(10, -100, "Tess level (+/-): %d", g_tessLevel);
+        g_hud.DrawString(10, -180, "Tess level (+/-): %d", g_tessLevel);
         if (numPrimsGenerated > 1000000) {
-            g_hud.DrawString(10, -80, "Primitives      : %3.1f million", (float)numPrimsGenerated/1000000.0);
+            g_hud.DrawString(10, -160, "Primitives      : %3.1f million", (float)numPrimsGenerated/1000000.0);
         } else if (numPrimsGenerated > 1000) {
-            g_hud.DrawString(10, -80, "Primitives      : %3.1f thousand", (float)numPrimsGenerated/1000.0);
+            g_hud.DrawString(10, -160, "Primitives      : %3.1f thousand", (float)numPrimsGenerated/1000.0);
         } else {
-            g_hud.DrawString(10, -80, "Primitives      : %d", numPrimsGenerated);
+            g_hud.DrawString(10, -160, "Primitives      : %d", numPrimsGenerated);
         }
-        g_hud.DrawString(10, -60, "Vertices        : %d", g_mesh->GetNumVertices());
-        g_hud.DrawString(10, -20, "FPS             : %3.1f", averageFps);
+        g_hud.DrawString(10, -140, "Vertices        : %d", g_mesh->GetNumVertices());
+        g_hud.DrawString(10, -20,  "FPS             : %3.1f", averageFps);
     }
 
     g_hud.Flush();
@@ -776,7 +776,7 @@ drawStroke(int x, int y) {
 
     glBindBufferBase(GL_UNIFORM_BUFFER, g_tessellationBinding, g_tessellationUB);
 
-    // make sure that the vertex buffer is interoped back as a GL resource.
+    // make sure that the vertex buffer is interoped back as a GL resources.
     g_mesh->BindVertexBuffer();
 
     glBindVertexArray(g_vao);
@@ -832,7 +832,7 @@ motion(GLFWwindow * w, double dx, double dy) {
             // pan
             g_pan[0] -= g_dolly*(x - g_prev_x)/g_width;
             g_pan[1] += g_dolly*(y - g_prev_y)/g_height;
-        } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) ||
+        } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) or
                    (!g_mbutton[0] && g_mbutton[1] && !g_mbutton[2])) {
             // dolly
             g_dolly -= g_dolly*0.01f*(x - g_prev_x);
@@ -860,7 +860,7 @@ mouse(GLFWwindow * w, int button, int state, int /* mods */) {
         g_mbutton[button] = (state == GLFW_PRESS);
     }
 
-    if (! glfwGetKey(w, GLFW_KEY_LEFT_ALT)) {
+    if (not glfwGetKey(w, GLFW_KEY_LEFT_ALT)) {
         if (g_mbutton[0] && !g_mbutton[1] && !g_mbutton[2]) {
             drawStroke(g_prev_x, g_prev_y);
         }
@@ -961,12 +961,6 @@ callbackModel(int m) {
     createOsdMesh();
 }
 
-static void
-callbackBrushSize(float value, int /* data */) {
-
-    g_brushSize = (int)value;
-}
-
 //------------------------------------------------------------------------------
 static void
 initHUD() {
@@ -988,13 +982,10 @@ initHUD() {
     g_hud.AddPullDownButton(shading_pulldown, "Shaded", 1, g_wire==1);
     g_hud.AddPullDownButton(shading_pulldown, "Wire+Shaded", 2, g_wire==2);
 
-    g_hud.AddSlider("Brush size", 10.0f, 500.0f, (float)g_brushSize,
-                     350, -60, 40, true, callbackBrushSize, 0);
-
     for (int i = 1; i < 11; ++i) {
         char level[16];
         sprintf(level, "Lv. %d", i);
-        g_hud.AddRadioButton(3, level, i==g_level, 10, 170+i*20, callbackLevel, i, '0'+(i%10));
+        g_hud.AddRadioButton(3, level, i==2, 10, 170+i*20, callbackLevel, i, '0'+(i%10));
     }
 
     int pulldown_handle = g_hud.AddPullDown("Shape (N)", -300, 10, 300, callbackModel, 'n');
@@ -1073,8 +1064,8 @@ idle() {
 //------------------------------------------------------------------------------
 static void
 callbackError(OpenSubdiv::Far::ErrorType err, const char *message) {
-    printf("OpenSubdiv Error: %d\n", err);
-    printf("    %s\n", message);
+    printf("Error: %d\n", err);
+    printf("%s", message);
 }
 
 //------------------------------------------------------------------------------
@@ -1087,22 +1078,29 @@ callbackErrorGLFW(int error, const char* description) {
 
 int main(int argc, char ** argv) {
 
-    ArgOptions args;
-
-    args.Parse(argc, argv);
-    args.PrintUnrecognizedArgsWarnings();
-
-    g_yup = args.GetYUp();
-    g_level = args.GetLevel();
-
-    ViewerArgsUtils::PopulateShapes(args, &g_defaultShapes);
-
+    bool fullscreen = false;
+    std::string str;
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "-d"))
+            g_level = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "-f"))
+            fullscreen = true;
+        else {
+            std::ifstream ifs(argv[1]);
+            if (ifs) {
+                std::stringstream ss;
+                ss << ifs.rdbuf();
+                ifs.close();
+                str = ss.str();
+                g_defaultShapes.push_back(ShapeDesc(argv[1], str.c_str(), kCatmark));
+            }
+        }
+    }
     initShapes();
-
     OpenSubdiv::Far::SetErrorCallback(callbackError);
 
     glfwSetErrorCallback(callbackErrorGLFW);
-    if (! glfwInit()) {
+    if (not glfwInit()) {
         printf("Failed to initialize GLFW\n");
         return 1;
     }
@@ -1111,13 +1109,13 @@ int main(int argc, char ** argv) {
 
     GLUtils::SetMinimumGLVersion();
 
-    if (args.GetFullScreen()) {
+    if (fullscreen) {
 
         g_primary = glfwGetPrimaryMonitor();
 
         // apparently glfwGetPrimaryMonitor fails under linux : if no primary,
         // settle for the first one in the list
-        if (! g_primary) {
+        if (not g_primary) {
             int count=0;
             GLFWmonitor ** monitors = glfwGetMonitors(&count);
 
@@ -1132,22 +1130,33 @@ int main(int argc, char ** argv) {
         }
     }
 
-    if (! (g_window=glfwCreateWindow(g_width, g_height, windowTitle,
-           args.GetFullScreen() && g_primary ? g_primary : NULL, NULL))) {
+    if (not (g_window=glfwCreateWindow(g_width, g_height, windowTitle,
+                                       fullscreen and g_primary ? g_primary : NULL, NULL))) {
         printf("Failed to open window.\n");
         glfwTerminate();
         return 1;
     }
-
     glfwMakeContextCurrent(g_window);
-
-    GLUtils::InitializeGL();
-    GLUtils::PrintGLVersion();
-
     glfwSetKeyCallback(g_window, keyboard);
     glfwSetCursorPosCallback(g_window, motion);
     glfwSetMouseButtonCallback(g_window, mouse);
     glfwSetWindowCloseCallback(g_window, windowClose);
+    GLUtils::PrintGLVersion();
+
+#if defined(OSD_USES_GLEW)
+#ifdef CORE_PROFILE
+    // this is the only way to initialize glew correctly under core profile context.
+    glewExperimental = true;
+#endif
+    if (GLenum r = glewInit() != GLEW_OK) {
+        printf("Failed to initialize glew. Error = %s\n", glewGetErrorString(r));
+        exit(1);
+    }
+#ifdef CORE_PROFILE
+    // clear GL errors which was generated during glewInit()
+    glGetError();
+#endif
+#endif
 
     initGL();
 

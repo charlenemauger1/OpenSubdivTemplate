@@ -26,7 +26,7 @@ set(SOURCE_FILES
     hbr_tutorial_2.cpp
 )
 
-osd_add_executable(hbr_tutorial_2 "tutorials/hbr"
+_add_executable(hbr_tutorial_2
     ${SOURCE_FILES}
 )
 

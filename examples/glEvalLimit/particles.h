@@ -25,9 +25,9 @@
 #ifndef ST_PARTICLES_H
 #define ST_PARTICLES_H
 
-#include <opensubdiv/far/topologyRefiner.h>
-#include <opensubdiv/far/patchMap.h>
-#include <opensubdiv/osd/types.h>
+#include <far/topologyRefiner.h>
+#include <far/patchMap.h>
+#include <osd/types.h>
 #include <iostream>
 
 //
@@ -39,7 +39,7 @@
 // particle is assigned a location on the subdivision surface limit that is
 // composed of a unique ptex face index, with a local (s,t) parametric pair.
 //
-// The system also generates an array of parametric velocities (ds, dt) for each
+// The system also generates an array of parametric velocties (ds, dt) for each
 // particle. An Update() function then applies the velocities to the locations and
 // moves the points along the parametric space.
 //
@@ -49,7 +49,7 @@
 // bounces it, if the edge happens to be a boundary.
 // 
 // Note: currently the adjacency code does not handle 'diagonal' crossings, nor
-// crossings between quad and non-quad faces.
+// crossings between quand and non-quad faces.
 //
 class STParticles {
 
@@ -148,6 +148,9 @@ public:
 
     friend std::ostream & operator << (std::ostream & os, STParticles const & f);
 
+    static void WarpParticle(std::vector<FaceInfo> const &adjacency,
+                             int edge, Position * p, float * dp);
+
 private:
 
     //
@@ -160,7 +163,6 @@ private:
     std::vector<OpenSubdiv::Osd::PatchCoord> _patchCoords;
 
     float _speed;  // velocity multiplier
-    int _regFaceSize;
 
     friend std::ostream & operator << (std::ostream & os, FaceInfo const & f);
 

@@ -31,7 +31,7 @@ if (DOXYGEN_FOUND)
     add_custom_target(doc_doxy
             ${DOXYGEN_EXECUTABLE} "${CMAKE_CURRENT_BINARY_DIR}/OpenSubdiv.doxy"
         WORKING_DIRECTORY
-            "${OpenSubdiv_BINARY_DIR}/public_headers/"
+            "${CMAKE_BINARY_DIR}/public_headers/"
         DEPENDS
             public_headers
         COMMENT
@@ -54,8 +54,10 @@ else()
 
 endif()
 
+find_package(PythonInterp 2.6)
+
 # ReST - HTML documentation
-if (DOCUTILS_FOUND AND Python_Interpreter_FOUND)
+if (DOCUTILS_FOUND AND PYTHONINTERP_FOUND)
 
     set(HTML_FILES
          search.html
@@ -64,7 +66,6 @@ if (DOCUTILS_FOUND AND Python_Interpreter_FOUND)
     set(RST_FILES
         additional_resources.rst
         api_overview.rst
-        bfr_overview.rst
         cmake_build.rst
         code_examples.rst
         compatibility.rst
@@ -84,27 +85,23 @@ if (DOCUTILS_FOUND AND Python_Interpreter_FOUND)
         hedits.rst
         hbr_overview.rst
         intro.rst
+        intro_30.rst
         license.rst
         mod_notes.rst
-        mtlviewer.rst
-        mtlptexviewer.rst
+        maya_osdpolysmooth.rst
         osd_overview.rst
         osd_shader_interface.rst
         porting.rst
         references.rst
-        release_30.rst
-        release_31.rst
-        release_32.rst
-        release_33.rst
-        release_34.rst
-        release_35.rst
-        release_36.rst
         release_notes.rst
         release_notes_2x.rst
+        roadmap.rst
         sdc_overview.rst
         subdivision_surfaces.rst
         tutorials.rst
+        using_osd.rst
         using_osd_hbr.rst
+        using_osd_textures.rst
         vtr_overview.rst
     )
 
@@ -172,27 +169,14 @@ if (DOCUTILS_FOUND AND Python_Interpreter_FOUND)
         hbr/tutorial_0/hbr_tutorial_0.cpp
         hbr/tutorial_1/hbr_tutorial_1.cpp
         hbr/tutorial_2/hbr_tutorial_2.cpp
-        far/tutorial_1_1/far_tutorial_1_1.cpp
-        far/tutorial_1_2/far_tutorial_1_2.cpp
-        far/tutorial_2_1/far_tutorial_2_1.cpp
-        far/tutorial_2_2/far_tutorial_2_2.cpp
-        far/tutorial_2_3/far_tutorial_2_3.cpp
-        far/tutorial_3_1/far_tutorial_3_1.cpp
-        far/tutorial_4_1/far_tutorial_4_1.cpp
-        far/tutorial_4_2/far_tutorial_4_2.cpp
-        far/tutorial_4_3/far_tutorial_4_3.cpp
-        far/tutorial_5_1/far_tutorial_5_1.cpp
-        far/tutorial_5_2/far_tutorial_5_2.cpp
-        far/tutorial_5_3/far_tutorial_5_3.cpp
-        bfr/tutorial_1_1/bfr_tutorial_1_1.cpp
-        bfr/tutorial_1_2/bfr_tutorial_1_2.cpp
-        bfr/tutorial_1_3/bfr_tutorial_1_3.cpp
-        bfr/tutorial_1_4/bfr_tutorial_1_4.cpp
-        bfr/tutorial_1_5/bfr_tutorial_1_5.cpp
-        bfr/tutorial_2_1/bfr_tutorial_2_1.cpp
-        bfr/tutorial_2_2/bfr_tutorial_2_2.cpp
-        bfr/tutorial_3_1/bfr_tutorial_3_1.cpp
-        bfr/tutorial_3_2/bfr_tutorial_3_2.cpp
+        far/tutorial_0/far_tutorial_0.cpp
+        far/tutorial_1/far_tutorial_1.cpp
+        far/tutorial_2/far_tutorial_2.cpp
+        far/tutorial_3/far_tutorial_3.cpp
+        far/tutorial_4/far_tutorial_4.cpp
+        far/tutorial_5/far_tutorial_5.cpp
+        far/tutorial_6/far_tutorial_6.cpp
+        far/tutorial_7/far_tutorial_7.cpp
         osd/tutorial_0/osd_tutorial_0.cpp
     )
 
@@ -200,7 +184,7 @@ if (DOCUTILS_FOUND AND Python_Interpreter_FOUND)
         get_filename_component(BASENAME ${tutorial} NAME_WE)
 
         string(REGEX REPLACE "(/)" "_" TARGET_NAME ${tutorial})
-        set(infile "${OpenSubdiv_SOURCE_DIR}/tutorials/${tutorial}")
+        set(infile "${CMAKE_SOURCE_DIR}/tutorials/${tutorial}")
         set(rstfile "${CMAKE_CURRENT_BINARY_DIR}/${BASENAME}.rst")
         set(htmlfile "${CMAKE_CURRENT_BINARY_DIR}/${BASENAME}.html")
 
@@ -209,7 +193,7 @@ if (DOCUTILS_FOUND AND Python_Interpreter_FOUND)
             OUTPUT
                 "${rstfile}"
             COMMAND
-                "${Python_EXECUTABLE}"
+                "${PYTHON_EXECUTABLE}"
             ARGS
                 "${CMAKE_CURRENT_SOURCE_DIR}/processTutorials.py"
                 "${infile}"
@@ -270,10 +254,7 @@ if (DOCUTILS_FOUND AND Python_Interpreter_FOUND)
                 -E copy "${infile}" "${outfile}"
         )
 
-        # Exclude generated search.html
-        if (NOT ${src} STREQUAL "search.html")
-            add_custom_target( ${src} DEPENDS "${outfile}")
-        endif()
+        add_custom_target( ${src} DEPENDS "${outfile}")
 
         list(APPEND HTML_TARGETS ${src})
 
@@ -305,7 +286,7 @@ if (DOCUTILS_FOUND AND Python_Interpreter_FOUND)
     # build search index and insert navigation tab
     add_custom_target(search_index
         COMMAND
-            "${Python_EXECUTABLE}"
+            "${PYTHON_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/processHtml.py"
             "${CMAKE_CURRENT_BINARY_DIR}"
             "${CMAKE_CURRENT_SOURCE_DIR}/nav_template.txt"

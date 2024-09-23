@@ -22,66 +22,63 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
+#include "../common/glUtils.h"
 
 #include <GLFW/glfw3.h>
 GLFWwindow* g_window=0;
 GLFWmonitor* g_primary=0;
 
 #include "../../regression/common/far_utils.h"
-#include "../../regression/common/arg_utils.h"
-#include "../common/viewerArgsUtils.h"
 #include "../common/stopwatch.h"
 #include "../common/simple_math.h"
 #include "../common/glHud.h"
 #include "../common/glControlMeshDisplay.h"
-#include "../common/glUtils.h"
 
-#include <opensubdiv/far/patchTableFactory.h>
-#include <opensubdiv/far/ptexIndices.h>
-#include <opensubdiv/far/stencilTableFactory.h>
+#include <far/patchTableFactory.h>
+#include <far/ptexIndices.h>
+#include <far/stencilTableFactory.h>
 
-#include <opensubdiv/osd/cpuGLVertexBuffer.h>
-#include <opensubdiv/osd/cpuVertexBuffer.h>
-#include <opensubdiv/osd/cpuEvaluator.h>
+#include <osd/cpuGLVertexBuffer.h>
+#include <osd/cpuVertexBuffer.h>
+#include <osd/cpuEvaluator.h>
 
 #if defined(OPENSUBDIV_HAS_OPENMP)
-    #include <opensubdiv/osd/ompEvaluator.h>
+    #include <osd/ompEvaluator.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_TBB
-    #include <opensubdiv/osd/tbbEvaluator.h>
+    #include <osd/tbbEvaluator.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_CUDA
-    #include <opensubdiv/osd/cudaVertexBuffer.h>
-    #include <opensubdiv/osd/cudaGLVertexBuffer.h>
-    #include <opensubdiv/osd/cudaEvaluator.h>
+    #include <osd/cudaVertexBuffer.h>
+    #include <osd/cudaGLVertexBuffer.h>
+    #include <osd/cudaEvaluator.h>
     #include "../common/cudaDeviceContext.h"
 
     CudaDeviceContext g_cudaDeviceContext;
 #endif
 
 #ifdef OPENSUBDIV_HAS_OPENCL
-    #include <opensubdiv/osd/clVertexBuffer.h>
-    #include <opensubdiv/osd/clGLVertexBuffer.h>
-    #include <opensubdiv/osd/clEvaluator.h>
+    #include <osd/clVertexBuffer.h>
+    #include <osd/clGLVertexBuffer.h>
+    #include <osd/clEvaluator.h>
     #include "../common/clDeviceContext.h"
 
     CLDeviceContext g_clDeviceContext;
 #endif
 
 #ifdef OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK
-    #include <opensubdiv/osd/glXFBEvaluator.h>
-    #include <opensubdiv/osd/glVertexBuffer.h>
+    #include <osd/glXFBEvaluator.h>
+    #include <osd/glVertexBuffer.h>
 #endif
 
 #ifdef OPENSUBDIV_HAS_GLSL_COMPUTE
-    #include <opensubdiv/osd/glComputeEvaluator.h>
-    #include <opensubdiv/osd/glVertexBuffer.h>
+    #include <osd/glComputeEvaluator.h>
+    #include <osd/glVertexBuffer.h>
 #endif
 
-#include <opensubdiv/osd/mesh.h>
+#include <osd/mesh.h>
 
 #include <cfloat>
 #include <list>
@@ -105,24 +102,23 @@ enum HudCheckBox { kHUD_CB_DISPLAY_CONTROL_MESH_EDGES,
                    kHUD_CB_DISPLAY_CONTROL_MESH_VERTS,
                    kHUD_CB_ANIMATE_VERTICES,
                    kHUD_CB_FREEZE,
-                   kHUD_CB_ADAPTIVE,
-                   kHUD_CB_INF_SHARP_PATCH };
+                   kHUD_CB_BILINEAR };
 
 int g_kernel = kCPU,
-    g_isolationLevel = 2; // max level of extraordinary feature isolation
+    g_isolationLevel = 5; // max level of extraordinary feature isolation
 
 int   g_running = 1,
       g_width = 1024,
       g_height = 1024,
+      g_fullscreen = 0,
       g_prev_x = 0,
       g_prev_y = 0,
       g_mbutton[3] = {0, 0, 0},
       g_frame=0,
       g_freeze=0,
-      g_repeatCount=0;
+      g_repeatCount;
 
-bool g_adaptive=true,
-     g_infSharpPatch=true;
+bool g_bilinear=false;
 
 float g_rotate[2] = {0, 0},
       g_dolly = 5,
@@ -130,8 +126,6 @@ float g_rotate[2] = {0, 0},
       g_center[3] = {0, 0, 0},
       g_size = 0,
       g_moveScale = 0.0f;
-
-bool  g_yup = false;
 
 struct Transform {
     float ModelViewMatrix[16];
@@ -297,19 +291,18 @@ createMesh(ShapeDesc const & shapeDesc, int level) {
 
     typedef Far::LimitStencilTableFactory::LocationArray LocationArray;
 
-    Shape const * shape = Shape::parseObj(shapeDesc);
+    Shape const * shape = Shape::parseObj(shapeDesc.data.c_str(), shapeDesc.scheme);
 
     // create Far mesh (topology)
-    Sdc::SchemeType sdctype = GetSdcType(*shape);
-    Sdc::Options sdcoptions = GetSdcOptions(*shape);
-    int regFaceSize = Sdc::SchemeTypeTraits::GetRegularFaceSize(sdctype);
+    OpenSubdiv::Sdc::SchemeType sdctype = GetSdcType(*shape);
+    OpenSubdiv::Sdc::Options sdcoptions = GetSdcOptions(*shape);
 
-    Far::TopologyRefiner * refiner =
-        Far::TopologyRefinerFactory<Shape>::Create(*shape,
-            Far::TopologyRefinerFactory<Shape>::Options(sdctype, sdcoptions));
+    OpenSubdiv::Far::TopologyRefiner * refiner =
+        OpenSubdiv::Far::TopologyRefinerFactory<Shape>::Create(*shape,
+            OpenSubdiv::Far::TopologyRefinerFactory<Shape>::Options(sdctype, sdcoptions));
 
     // save coarse topology (used for coarse mesh drawing)
-    Far::TopologyLevel const & refBaseLevel = refiner->GetLevel(0);
+    OpenSubdiv::Far::TopologyLevel const & refBaseLevel = refiner->GetLevel(0);
 
     g_controlMeshDisplay.SetTopology(refBaseLevel);
     int nverts = refBaseLevel.GetNumVertices();
@@ -317,30 +310,13 @@ createMesh(ShapeDesc const & shapeDesc, int level) {
     // save rest pose
     g_orgPositions = shape->verts;
 
-    // compute model bounding
-    float min[3] = { FLT_MAX,  FLT_MAX,  FLT_MAX};
-    float max[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
-    for (size_t i=0; i <g_orgPositions.size()/3; ++i) {
-        for(int j=0; j<3; ++j) {
-            float v = g_orgPositions[i*3+j];
-            min[j] = std::min(min[j], v);
-            max[j] = std::max(max[j], v);
-        }
-    }
-    for (int j=0; j<3; ++j) {
-        g_center[j] = (min[j] + max[j]) * 0.5f;
-        g_size += (max[j]-min[j])*(max[j]-min[j]);
-    }
-    g_size = sqrtf(g_size);
-
-    if (!g_adaptive) {
+    if (g_bilinear) {
         Far::TopologyRefiner::UniformOptions options(level);
         options.fullTopologyInLastLevel = true;
         refiner->RefineUniform(options);
     } else {
         Far::TopologyRefiner::AdaptiveOptions options(level);
         options.useSingleCreasePatch = false;
-        options.useInfSharpPatch = g_infSharpPatch;
         refiner->RefineAdaptive(options);
     }
 
@@ -362,15 +338,8 @@ createMesh(ShapeDesc const & shapeDesc, int level) {
         larray.t = vPtr;
 
         for (int j=0; j<g_nsamples; ++j, ++uPtr, ++vPtr) {
-            float u = (float)rand()/(float)RAND_MAX;
-            float v = (float)rand()/(float)RAND_MAX;
-            if ((regFaceSize==3) && (u+v >= 1.0f)) {
-                // Keep locations within the triangular parametric domain
-                u = 1.0f - u;
-                v = 1.0f - v;
-            }
-            *uPtr = u;
-            *vPtr = v;
+            *uPtr = (float)rand()/(float)RAND_MAX;
+            *vPtr = (float)rand()/(float)RAND_MAX;
         }
     }
 
@@ -511,8 +480,8 @@ public:
 
     void Use( ) {
 
-        if (! _program) {
-            assert( _vtxSrc && _frgSrc );
+        if (not _program) {
+            assert( _vtxSrc and _frgSrc );
 
             _program = glCreateProgram();
 
@@ -734,9 +703,7 @@ display() {
     translate(g_transformData.ModelViewMatrix, -g_pan[0], -g_pan[1], -g_dolly);
     rotate(g_transformData.ModelViewMatrix, g_rotate[1], 1, 0, 0);
     rotate(g_transformData.ModelViewMatrix, g_rotate[0], 0, 1, 0);
-    if (!g_yup) {
-        rotate(g_transformData.ModelViewMatrix, -90, 1, 0, 0);
-    }
+    rotate(g_transformData.ModelViewMatrix, -90, 1, 0, 0);
     translate(g_transformData.ModelViewMatrix,
               -g_center[0], -g_center[1], -g_center[2]);
     perspective(g_transformData.ProjectionMatrix,
@@ -782,12 +749,12 @@ display() {
 static void
 idle() {
 
-    if (! g_freeze)
+    if (not g_freeze)
         g_frame++;
 
     updateGeom();
 
-    if (g_repeatCount != 0 && g_frame >= g_repeatCount)
+    if (g_repeatCount != 0 and g_frame >= g_repeatCount)
         g_running = 0;
 }
 
@@ -804,7 +771,7 @@ motion(GLFWwindow *, double dx, double dy) {
         // pan
         g_pan[0] -= g_dolly*(x - g_prev_x)/g_width;
         g_pan[1] += g_dolly*(y - g_prev_y)/g_height;
-    } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) ||
+    } else if ((g_mbutton[0] && !g_mbutton[1] && g_mbutton[2]) or
                (!g_mbutton[0] && g_mbutton[1] && !g_mbutton[2])) {
         // dolly
         g_dolly -= g_dolly*0.01f*(x - g_prev_x);
@@ -868,14 +835,6 @@ setSamples(bool add) {
 
 //------------------------------------------------------------------------------
 static void
-fitFrame() {
-
-    g_pan[0] = g_pan[1] = 0;
-    g_dolly = g_size;
-}
-
-//------------------------------------------------------------------------------
-static void
 keyboard(GLFWwindow *, int key, int /* scancode */, int event, int /* mods */) {
 
     if (event == GLFW_RELEASE) return;
@@ -883,8 +842,6 @@ keyboard(GLFWwindow *, int key, int /* scancode */, int event, int /* mods */) {
 
     switch (key) {
         case 'Q': g_running = 0; break;
-
-        case 'F': fitFrame(); break;
 
         case '=': setSamples(true); break;
 
@@ -901,7 +858,7 @@ callbackKernel(int k) {
     g_kernel = k;
 
 #ifdef OPENSUBDIV_HAS_OPENCL
-    if (g_kernel == kCL && (!g_clDeviceContext.IsInitialized())) {
+    if (g_kernel == kCL and (not g_clDeviceContext.IsInitialized())) {
         if (g_clDeviceContext.Initialize() == false) {
             printf("Error in initializing OpenCL\n");
             exit(1);
@@ -909,7 +866,7 @@ callbackKernel(int k) {
     }
 #endif
 #ifdef OPENSUBDIV_HAS_CUDA
-    if (g_kernel == kCUDA && (!g_cudaDeviceContext.IsInitialized())) {
+    if (g_kernel == kCUDA and (not g_cudaDeviceContext.IsInitialized())) {
         if (g_cudaDeviceContext.Initialize() == false) {
             printf("Error in initializing Cuda\n");
             exit(1);
@@ -959,14 +916,9 @@ callbackCheckBox(bool checked, int button) {
     case kHUD_CB_FREEZE:
         g_freeze = checked;
         break;
-    case kHUD_CB_ADAPTIVE:
-        g_adaptive = checked;
+    case kHUD_CB_BILINEAR:
+        g_bilinear = checked;
         rebuildMesh();
-        break;
-    case kHUD_CB_INF_SHARP_PATCH:
-        g_infSharpPatch = checked;
-        rebuildMesh();
-        break;
     }
 }
 
@@ -995,11 +947,8 @@ initHUD() {
                       10, 50, callbackCheckBox, kHUD_CB_ANIMATE_VERTICES, 'm');
     g_hud.AddCheckBox("Freeze (spc)", g_freeze != 0,
                       10, 70, callbackCheckBox, kHUD_CB_FREEZE, ' ');
-
-    g_hud.AddCheckBox("Adaptive (`)", g_adaptive != 0,
-                      10, 190, callbackCheckBox, kHUD_CB_ADAPTIVE, '`');
-    g_hud.AddCheckBox("Inf Sharp Patch  (I)", g_infSharpPatch != 0,
-                      10, 210, callbackCheckBox, kHUD_CB_INF_SHARP_PATCH, 'i');
+    g_hud.AddCheckBox("Bilinear Stencils (`)", g_bilinear != 0,
+                      10, 190, callbackCheckBox, kHUD_CB_BILINEAR, '`');
 
     int compute_pulldown = g_hud.AddPullDown("Compute (K)", 250, 10, 300, callbackKernel, 'k');
     g_hud.AddPullDownButton(compute_pulldown, "CPU", kCPU);
@@ -1029,7 +978,7 @@ initHUD() {
     for (int i = 1; i < 11; ++i) {
         char level[16];
         sprintf(level, "Lv. %d", i);
-        g_hud.AddRadioButton(3, level, i==g_isolationLevel, 10, 250+i*20, callbackLevel, i, '0'+(i%10));
+        g_hud.AddRadioButton(3, level, i==g_isolationLevel, 10, 210+i*20, callbackLevel, i, '0'+(i%10));
     }
 
     int pulldown_handle = g_hud.AddPullDown("Shape (N)", -300, 10, 300, callbackModel, 'n');
@@ -1065,22 +1014,30 @@ callbackErrorGLFW(int error, const char* description) {
 //------------------------------------------------------------------------------
 int main(int argc, char **argv) {
 
-    ArgOptions args;
+    bool fullscreen = false;
 
-    args.Parse(argc, argv);
-    args.PrintUnrecognizedArgsWarnings();
-
-    g_yup = args.GetYUp();
-    g_adaptive = args.GetAdaptive();
-    g_isolationLevel = args.GetLevel();
-    g_repeatCount = args.GetRepeatCount();
-
-    ViewerArgsUtils::PopulateShapes(args, &g_defaultShapes);
+    std::string str;
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "-d")) {
+            g_isolationLevel = atoi(argv[++i]);
+        } else if (!strcmp(argv[i], "-f")) {
+            fullscreen = true;
+        } else {
+            std::ifstream ifs(argv[1]);
+            if (ifs) {
+                std::stringstream ss;
+                ss << ifs.rdbuf();
+                ifs.close();
+                str = ss.str();
+                g_defaultShapes.push_back(ShapeDesc(argv[1], str.c_str(), kCatmark));
+            }
+        }
+    }
 
     initShapes();
 
     glfwSetErrorCallback(callbackErrorGLFW);
-    if (! glfwInit()) {
+    if (not glfwInit()) {
         printf("Failed to initialize GLFW\n");
         return 1;
     }
@@ -1089,13 +1046,13 @@ int main(int argc, char **argv) {
 
     GLUtils::SetMinimumGLVersion();
 
-    if (args.GetFullScreen()) {
+    if (fullscreen) {
 
         g_primary = glfwGetPrimaryMonitor();
 
         // apparently glfwGetPrimaryMonitor fails under linux : if no primary,
         // settle for the first one in the list
-        if (! g_primary) {
+        if (not g_primary) {
             int count=0;
             GLFWmonitor ** monitors = glfwGetMonitors(&count);
 
@@ -1110,15 +1067,13 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (! (g_window=glfwCreateWindow(g_width, g_height, windowTitle,
-           args.GetFullScreen() && g_primary ? g_primary : NULL, NULL))) {
+    if (not (g_window=glfwCreateWindow(g_width, g_height, windowTitle,
+                           fullscreen and g_primary ? g_primary : NULL, NULL))) {
         std::cerr << "Failed to create OpenGL context.\n";
         glfwTerminate();
         return 1;
     }
     glfwMakeContextCurrent(g_window);
-
-    GLUtils::InitializeGL();
     GLUtils::PrintGLVersion();
 
     // accommodate high DPI displays (e.g. mac retina displays)
@@ -1129,6 +1084,21 @@ int main(int argc, char **argv) {
     glfwSetCursorPosCallback(g_window, motion);
     glfwSetMouseButtonCallback(g_window, mouse);
     glfwSetWindowCloseCallback(g_window, windowClose);
+
+#if defined(OSD_USES_GLEW)
+#ifdef CORE_PROFILE
+    // this is the only way to initialize glew correctly under core profile context.
+    glewExperimental = true;
+#endif
+    if (GLenum r = glewInit() != GLEW_OK) {
+        printf("Failed to initialize glew. Error = %s\n", glewGetErrorString(r));
+        exit(1);
+    }
+#ifdef CORE_PROFILE
+    // clear GL errors which was generated during glewInit()
+    glGetError();
+#endif
+#endif
 
     initGL();
     linkDefaultPrograms();

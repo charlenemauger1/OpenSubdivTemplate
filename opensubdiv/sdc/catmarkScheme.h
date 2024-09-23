@@ -104,7 +104,7 @@ Scheme<SCHEME_CATMARK>::assignSmoothMaskForEdge(EDGE const& edge, MASK& mask) co
         }
     }
 
-    if (! useTriangleOption) {
+    if (not useTriangleOption) {
         mask.VertexWeight(0) = 0.25f;
         mask.VertexWeight(1) = 0.25f;
 
@@ -121,7 +121,7 @@ Scheme<SCHEME_CATMARK>::assignSmoothMaskForEdge(EDGE const& edge, MASK& mask) co
         //
         //  This mimics the implementation in Hbr in terms of order of operations.
         //
-        const Weight CATMARK_SMOOTH_TRI_EDGE_WEIGHT = (Weight) 0.470;
+        const Weight CATMARK_SMOOTH_TRI_EDGE_WEIGHT = 0.470f;
 
         Weight f0Weight = face0IsTri ? CATMARK_SMOOTH_TRI_EDGE_WEIGHT : 0.25f;
         Weight f1Weight = face1IsTri ? CATMARK_SMOOTH_TRI_EDGE_WEIGHT : 0.25f;
@@ -230,8 +230,8 @@ Scheme<SCHEME_CATMARK>::assignCreaseLimitMask(VERTEX const& vertex, MASK& posMas
     posMask.SetNumFaceWeights(0);
     posMask.SetFaceWeightsForFaceCenters(false);
 
-    Weight vWeight = (Weight)(2.0 / 3.0);
-    Weight eWeight = (Weight)(1.0 / 6.0);
+    Weight vWeight = 2.0f / 3.0f;
+    Weight eWeight = 1.0f / 6.0f;
 
     posMask.VertexWeight(0) = vWeight;
     for (int i = 0; i < valence; ++i) {
@@ -261,9 +261,9 @@ Scheme<SCHEME_CATMARK>::assignSmoothLimitMask(VERTEX const& vertex, MASK& posMas
 
     //  Specialize for the regular case:
     if (valence == 4) {
-        Weight fWeight = (Weight)(1.0 / 36.0);
-        Weight eWeight = (Weight)(1.0 /  9.0);
-        Weight vWeight = (Weight)(4.0 /  9.0);
+        Weight fWeight = 1.0f / 36.0f;
+        Weight eWeight = 1.0f /  9.0f;
+        Weight vWeight = 4.0f /  9.0f;
 
         posMask.VertexWeight(0) = vWeight;
 
@@ -277,11 +277,9 @@ Scheme<SCHEME_CATMARK>::assignSmoothLimitMask(VERTEX const& vertex, MASK& posMas
         posMask.FaceWeight(2) = fWeight;
         posMask.FaceWeight(3) = fWeight;
     } else {
-        Weight Valence = (Weight) valence;
-
-        Weight fWeight = 1.0f / (Valence * (Valence + 5.0f));
+        Weight fWeight = 1.0f / (Weight)(valence * (valence + 5.0f));
         Weight eWeight = 4.0f * fWeight;
-        Weight vWeight = 1.0f - Valence * (eWeight + fWeight);
+        Weight vWeight = (Weight)(1.0f - valence * (eWeight + fWeight));
 
         posMask.VertexWeight(0) = vWeight;
         for (int i = 0; i < valence; ++i) {
@@ -364,7 +362,7 @@ Scheme<SCHEME_CATMARK>::assignCreaseLimitTangentMasks(VERTEX const& vertex,
 
     //
     //  Second, the tangent across the interior faces:
-    //      Note this is ambiguous for an interior vertex.  We currently return
+    //      Note this is ambigous for an interior vertex.  We currently return
     //  the tangent for the surface in the counter-clockwise span between the
     //  leading and trailing edges that form the crease.  Given the expected
     //  computation of a surface normal as Tan1 X Tan2, this tangent should be
@@ -387,14 +385,14 @@ Scheme<SCHEME_CATMARK>::assignCreaseLimitTangentMasks(VERTEX const& vertex,
     if (interiorEdgeCount == 1) {
         //  The regular case -- uniform B-spline cross-tangent:
 
-        tan2Mask.VertexWeight(0) = (Weight)(-4.0 / 6.0);
+        tan2Mask.VertexWeight(0) = -4.0f / 6.0f;
 
-        tan2Mask.EdgeWeight(creaseEnds[0])     = (Weight)(-1.0 / 6.0);
-        tan2Mask.EdgeWeight(creaseEnds[0] + 1) = (Weight)( 4.0 / 6.0);
-        tan2Mask.EdgeWeight(creaseEnds[1])     = (Weight)(-1.0 / 6.0);
+        tan2Mask.EdgeWeight(creaseEnds[0])     = -1.0f / 6.0f;
+        tan2Mask.EdgeWeight(creaseEnds[0] + 1) =  4.0f / 6.0f;
+        tan2Mask.EdgeWeight(creaseEnds[1])     = -1.0f / 6.0f;
 
-        tan2Mask.FaceWeight(creaseEnds[0])     = (Weight)(1.0 / 6.0);
-        tan2Mask.FaceWeight(creaseEnds[0] + 1) = (Weight)(1.0 / 6.0);
+        tan2Mask.FaceWeight(creaseEnds[0])     = 1.0f / 6.0f;
+        tan2Mask.FaceWeight(creaseEnds[0] + 1) = 1.0f / 6.0f;
     } else if (interiorEdgeCount > 1) {
         //  The irregular case -- formulae from Biermann et al:
 
@@ -485,7 +483,7 @@ Scheme<SCHEME_CATMARK>::assignSmoothLimitTangentMasks(VERTEX const& vertex,
         double cosTheta     = std::cos(theta);
         double cosHalfTheta = std::cos(theta * 0.5f);
 
-        double lambda = (5.0 / 16.0) + (1.0 / 16.0) *
+        double lambda = (5.0f / 16.0f) + (1.0f / 16.0f) *
                 (cosTheta + cosHalfTheta * std::sqrt(2.0f * (9.0f + cosTheta)));
 
         double edgeWeightScale = 4.0f;

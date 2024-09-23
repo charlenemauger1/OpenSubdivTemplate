@@ -22,32 +22,18 @@
 #   language governing permissions and limitations under the Apache License.
 #
 
-cmake_minimum_required(VERSION 3.12)
-
 project(OpenSubdiv)
 
-# Set C++ standard requirements, allowing overrides
-if (NOT DEFINED CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 14)
-endif()
-if (NOT DEFINED CMAKE_CXX_STANDARD_REQUIRED)
-    set(CMAKE_CXX_STANDARD_REQUIRED ON)
-endif()
-if (NOT DEFINED CMAKE_CXX_EXTENSIONS)
-    set(CMAKE_CXX_EXTENSIONS OFF)
-endif()
-
-# Turn on folder support
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+cmake_minimum_required(VERSION 2.8.6)
 
 #-------------------------------------------------------------------------------
 # Obtain OpenSubdiv API version from version.h file
-if(EXISTS "${OpenSubdiv_SOURCE_DIR}/opensubdiv/version.h")
-    file(STRINGS "${OpenSubdiv_SOURCE_DIR}/opensubdiv/version.h"
+if(EXISTS "${CMAKE_SOURCE_DIR}/opensubdiv/version.h")
+    file(STRINGS "${CMAKE_SOURCE_DIR}/opensubdiv/version.h"
         OpenSubdiv_VERSION REGEX "^#define OPENSUBDIV_VERSION .*$")
     string(REPLACE "#define OPENSUBDIV_VERSION " "" OpenSubdiv_VERSION ${OpenSubdiv_VERSION})
 else()
-    message(FATAL_ERROR, "Cannot locate opensubdiv/version.h in ${OpenSubdiv_SOURCE_DIR}")
+    message(FATAL_ERROR, "Cannot locate opensubdiv/version.h in CMAKE_SOURCE_DIR")
 endif()
 
 # Evaluate 'soname' from OSD version
@@ -64,17 +50,10 @@ endif()
 
 #-------------------------------------------------------------------------------
 
-message(STATUS "Compiling ${PROJECT_NAME} version ${OpenSubdiv_VERSION}")
+message(STATUS "Compiling ${CMAKE_PROJECT_NAME} version ${OpenSubdiv_VERSION}")
 message(STATUS "Using cmake version ${CMAKE_VERSION}")
 
 #-------------------------------------------------------------------------------
-# Determine if the project is built as a subproject (using add_subdirectory)
-# or if it is the main project.
-set(MAIN_PROJECT OFF)
-if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-    set(MAIN_PROJECT ON)
-endif()
-
 # Specify the default install path
 if (NOT DEFINED CMAKE_INSTALL_PREFIX)
     SET( CMAKE_INSTALL_PREFIX "${PROJECT_BINARY_DIR}/" )
@@ -90,10 +69,6 @@ endif()
 
 if (NOT DEFINED CMAKE_LIBDIR_BASE)
     set( CMAKE_LIBDIR_BASE lib )
-endif()
-
-if (NOT DEFINED CMAKE_FRAMEWORKDIR_BASE)
-    set( CMAKE_FRAMEWORKDIR_BASE Frameworks )
 endif()
 
 if (NOT DEFINED CMAKE_PLUGINDIR_BASE)
@@ -115,25 +90,23 @@ if(LIBRARY_OUTPUT_PATH_ROOT)
     SET( CMAKE_INSTALL_PREFIX "${LIBRARY_OUTPUT_PATH_ROOT}/" )
 endif()
 
-if (MAIN_PROJECT)
-    # Set the directory where the executables will be stored.
-    set(EXECUTABLE_OUTPUT_PATH
-        "${PROJECT_BINARY_DIR}/bin"
-        CACHE PATH
-        "Directory where executables will be stored"
-    )
+# Set the directory where the executables will be stored.
+set(EXECUTABLE_OUTPUT_PATH
+    "${PROJECT_BINARY_DIR}/bin"
+    CACHE PATH
+    "Directory where executables will be stored"
+)
 
-    # Set the directory where the libraries will be stored.
-    set(LIBRARY_OUTPUT_PATH
-        "${PROJECT_BINARY_DIR}/lib"
-        CACHE PATH
-        "Directory where all libraries will be stored"
-    )
-endif()
+# Set the directory where the libraries will be stored.
+set(LIBRARY_OUTPUT_PATH
+    "${PROJECT_BINARY_DIR}/lib"
+    CACHE PATH
+    "Directory where all libraries will be stored"
+)
 
 # Specify the list of directories to search for cmake modules.
-list(APPEND CMAKE_MODULE_PATH
-    "${PROJECT_SOURCE_DIR}/cmake"
+set(CMAKE_MODULE_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
 )
 
 #-------------------------------------------------------------------------------
@@ -145,9 +118,9 @@ if (CMAKE_COMPILER_IS_GNUCC)
 endif()
 
 # Detect Clang (until a cmake version provides built-in variables)
-if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     set(CMAKE_COMPILER_IS_CLANGCC 1)
-elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Intel")
+elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel")
     set(CMAKE_COMPILER_IS_ICC 1)
 endif()
 
@@ -164,15 +137,10 @@ endif()
 # which point to directories outside the build tree to the install RPATH
 SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-# ensure that ARC is shown as enabled in the Xcode UI
-if(CMAKE_GENERATOR STREQUAL "Xcode")
-    set (CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES")
-endif()
-
 
 set(OSD_COMPILER_FLAGS)
 
-# Disable spurious warnings in gcc builds and clang
+# Disable spurrious warnings in gcc builds and clang
 if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANGCC OR CMAKE_COMPILER_IS_ICC )
 
     # Turn on all warnings
@@ -182,17 +150,8 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANGCC OR CMAKE_COMPILER_IS_IC
         list(APPEND OSD_COMPILER_FLAGS -Wall -Wextra)
     endif()
 
-    if(WIN32)
-        # Make sure the constants in <math.h>/<cmath> get defined.
-        list(APPEND OSD_COMPILER_FLAGS -D_USE_MATH_DEFINES)
-
-        # Make sure WinDef.h does not define min and max macros which
-        # will conflict with std::min() and std::max().
-        list(APPEND OSD_COMPILER_FLAGS -DNOMINMAX)
-    endif()
-
     # HBR uses the offsetof macro on a templated struct, which appears
-    # to spuriously set off this warning in both gcc and Clang
+    # to spurriously set off this warning in both gccc and Clang
     list(APPEND OSD_COMPILER_FLAGS -Wno-invalid-offsetof)
 
     # HBR uses unions as an optimization for its memory allocation.
@@ -202,7 +161,7 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANGCC OR CMAKE_COMPILER_IS_IC
     list(APPEND OSD_COMPILER_FLAGS -Wno-strict-aliasing)
 
     # FAR and OSD have templated virtual function implementations that trigger
-    # a lot of hidden virtual function overloads (some of them spurious).
+    # a lot of hidden virtual function overloads (some of them spurrious).
     # Disable those for now in Clang.
     if(CMAKE_COMPILER_IS_CLANGCC)
         list(APPEND OSD_COMPILER_FLAGS -Wno-overloaded-virtual)
@@ -242,6 +201,40 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANGCC OR CMAKE_COMPILER_IS_IC
 
 elseif(MSVC)
 
+    # Turn on all warnings
+    list(APPEND OSD_COMPILER_FLAGS /Wall)
+
+    # MSVC is unfortunately not standard conforming with regards to
+    # the alternative names for logical and bitwise operators:
+    # http://stackoverflow.com/questions/555505/c-alternative-tokens
+    # http://stackoverflow.com/questions/6006526/c-writing-or-instead-of
+    #
+    # This can be solved by including iso646.h, but that is a rather
+    # unsatisfactory solution since we then always have to remember to
+    # include this header file.  Instead we define these operators
+    # ourselves as command line arguments to cl.exe.
+    #
+    # An alternative would be to compile with the /Za option
+    # (but unfortunately that breaks other code):
+    # http://msdn.microsoft.com/en-us/library/0k0w269d.aspx
+    list(APPEND OSD_COMPILER_FLAGS
+                    /Dand=&&
+                    /Dand_eq=&=
+                    /Dbitand=&
+                    /Dbitor=|
+                    /Dcompl=~
+                    /Dnot=!
+                    /Dnot_eq=!=
+                    /Dor=||
+                    /Dor_eq=|=
+                    # nvcc does not seem to like a caret being the last character
+                    # in a command line defined preprocessor symbol, so add an
+                    # empty trailing comment to avoid this.
+                    /Dxor=^/**/
+                    /Dxor_eq=^=
+    )
+
+
     list(APPEND OSD_COMPILER_FLAGS
                     /W3     # Use warning level recommended for production purposes.
                     /WX     # Treat all compiler warnings as errors.
@@ -279,24 +272,11 @@ elseif(MSVC)
                     #/D_HAS_ITERATOR_DEBUGGING=0
     )
 
-    option(MSVC_STATIC_CRT "Statically link MSVC CRT" OFF)
-
-    if(MSVC_STATIC_CRT)
-        message(STATUS "Using static MSVC CRT")
-        # http://stackoverflow.com/a/32128977/486990
-        add_compile_options(
-            "$<$<CONFIG:Debug>:/MTd>"
-            "$<$<CONFIG:RelWithDebInfo>:/MT>"
-            "$<$<CONFIG:Release>:/MT>"
-            "$<$<CONFIG:MinSizeRel>:/MT>"
-        )
-    else()
-        # Turn off a duplicate LIBCMT linker warning
-        set(CMAKE_EXE_LINKER_FLAGS
-            "${CMAKE_EXE_LINKER_FLAGS} /NODEFAULTLIB:libcmt.lib")
-        set(CMAKE_SHARED_LINKER_FLAGS
-            "${CMAKE_SHARED_LINKER_FLAGS} /NODEFAULTLIB:libcmt.lib")
-    endif()
+    # Turn off a duplicate LIBCMT linker warning
+    set(CMAKE_EXE_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} /NODEFAULTLIB:libcmt.lib")
+    set(CMAKE_SHARED_LINKER_FLAGS
+        "${CMAKE_SHARED_LINKER_FLAGS} /NODEFAULTLIB:libcmt.lib")
 
 endif()
 
@@ -315,11 +295,13 @@ set(CMAKE_SUPPRESS_REGENERATION TRUE)
 option(PTEX_LOCATION "Path to Ptex" "")
 option(GLEW_LOCATION "Path to GLEW" "")
 option(GLFW_LOCATION "Path to GLFW" "")
+option(MAYA_LOCATION "Path to Maya" "")
 
 option(NO_LIB "Disable the opensubdiv libs build (caveat emptor)" OFF)
 option(NO_EXAMPLES "Disable examples build" OFF)
 option(NO_TUTORIALS "Disable tutorials build" OFF)
 option(NO_REGRESSION "Disable regression tests build" OFF)
+option(NO_MAYA "Disable Maya plugin build" OFF)
 option(NO_PTEX "Disable PTex support" OFF)
 option(NO_DOC "Disable documentation build" OFF)
 option(NO_OMP "Disable OpenMP backend" OFF)
@@ -328,23 +310,9 @@ option(NO_CUDA "Disable CUDA backend" OFF)
 option(NO_OPENCL "Disable OpenCL backend" OFF)
 option(NO_CLEW "Disable CLEW wrapper library" OFF)
 option(NO_OPENGL "Disable OpenGL support")
-option(NO_METAL "Disable Metal support" OFF)
 option(NO_DX "Disable DirectX support")
 option(NO_TESTS "Disable all tests")
 option(NO_GLTESTS "Disable GL tests")
-option(NO_GLEW "Disable use of GLEW" ON)
-option(NO_GLFW "Disable components depending on GLFW" OFF)
-option(NO_GLFW_X11 "Disable GLFW components depending on X11" OFF)
-option(NO_MACOS_FRAMEWORK "Disable generation of framework on macOS" OFF)
-
-option(OPENSUBDIV_GREGORY_EVAL_TRUE_DERIVATIVES "Enable true derivative evaluation for Gregory basis patches" OFF)
-
-option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-
-# Save the current value of BUILD_SHARED_LIBS and restore it after
-# processing Find* modules, since some of the Find* modules invoked
-# below may wind up stomping over this value.
-set(build_shared_libs "${BUILD_SHARED_LIBS}")
 
 set(OSD_GPU FALSE)
 
@@ -353,7 +321,7 @@ if(NOT NO_OMP)
     find_package(OpenMP)
 endif()
 if(NOT NO_TBB)
-    find_package(TBB 2018 COMPONENTS tbb)
+    find_package(TBB 4.0)
 endif()
 if (NOT NO_OPENGL)
     find_package(OpenGL)
@@ -372,36 +340,29 @@ endif()
 if(NOT NO_CUDA)
     find_package(CUDA 4.0)
 endif()
-if(NOT NO_GLFW AND NOT NO_OPENGL AND NOT ANDROID AND NOT IOS)
+if(NOT NO_OPENGL AND NOT ANDROID AND NOT IOS)
     find_package(GLFW 3.0.0)
 endif()
 if(NOT NO_PTEX)
    find_package(PTex 2.0)
-   find_package(ZLIB 1.2)
-endif()
-if(APPLE AND NOT NO_METAL)
-    find_package(Metal)
 endif()
 if (OPENGL_FOUND AND NOT IOS)
     add_definitions(
         -DOPENSUBDIV_HAS_OPENGL
     )
-    if (NOT NO_GLEW)
-        if (APPLE)
-            find_package(GLEW)
-        else()
-            find_package(GLEW REQUIRED)
-        endif()
-    endif()
-    if(GLEW_FOUND)
-        add_definitions( -DOSD_USES_GLEW )
+    if (APPLE)
+        find_package(GLEW)
     else()
-        add_definitions( -DOSD_USES_INTERNAL_GLAPILOADER )
+        find_package(GLEW REQUIRED)
     endif()
 endif()
 
 if (WIN32 AND NOT NO_DX)
    find_package(DXSDK)
+endif()
+
+if (NOT NO_MAYA)
+find_package(Maya 201200)
 endif()
 
 if (NOT NO_DOC)
@@ -410,11 +371,6 @@ if (NOT NO_DOC)
 else()
     set(DOXYGEN_EXECUTABLE )
 endif()
-
-# Python is used optionally to process source and documentation source files.
-find_package(Python COMPONENTS Interpreter)
-
-set(BUILD_SHARED_LIBS "${build_shared_libs}")
 
 # Warn about missing dependencies that will cause parts of OpenSubdiv to be
 # disabled.  Also, add preprocessor defines that can be used in the source
@@ -446,14 +402,10 @@ else()
     if (NOT NO_TBB)
         message(WARNING
             "TBB was not found : support for TBB parallel compute kernels "
-            "will be disabled in Osd.  If your environment supports TBB, "
-            "please make sure that TBB's CMake config is available in the "
-            "find_package() search path.")
+            "will be disabled in Osd.  If your compiler supports TBB "
+            "directives, please refer to the FindTBB.cmake shared module "
+            "in your cmake installation.")
     endif()
-endif()
-
-if( METAL_FOUND AND NOT NO_METAL)
-    set(OSD_GPU TRUE)
 endif()
 
 if( OPENGL_FOUND AND NOT NO_OPENGL)
@@ -464,49 +416,13 @@ if(GLFW_FOUND AND (GLFW_VERSION VERSION_EQUAL 3.0 OR GLFW_VERSION VERSION_GREATE
     add_definitions( -DGLFW_VERSION_3 )
 endif()
 
-macro(osd_detect_gl_version header)
-
-   if (EXISTS "${header}")
-       file(STRINGS "${header}" VERSION_4_2 REGEX "^#define GL_VERSION_4_2.*$")
-       if (VERSION_4_2)
-           set(OPENGL_4_2_FOUND TRUE)
-       else ()
-           message(WARNING "OpenGL 4.2 dependent features not enabled")
-       endif ()
-
-       file(STRINGS "${header}" VERSION_4_3 REGEX "^#define GL_VERSION_4_3.*$")
-       if (VERSION_4_3)
-           SET(OPENGL_4_3_FOUND TRUE)
-       else ()
-           message(WARNING "OpenGL 4.3 dependent features not enabled")
-       endif ()
-   endif ()
-
-endmacro()
-
-if(GLEW_FOUND AND GLEW_INCLUDE_DIR)
-
-    osd_detect_gl_version(${GLEW_INCLUDE_DIR}/GL/glew.h)
-    set(OPENGL_LOADER_INCLUDE_DIRS
-        ${GLEW_INCLUDE_DIR}
-        ${PROJECT_SOURCE_DIR}/glLoader)
-    set(OPENGL_LOADER_LIBRARIES
-        ${GLEW_LIBRARY}
-        OpenGL::GL
-        ${CMAKE_DL_LIBS})
-
-elseif(OPENGL_FOUND)
-
-    osd_detect_gl_version(${PROJECT_SOURCE_DIR}/glLoader/glApi.h)
-    set(OPENGL_LOADER_INCLUDE_DIRS
-        ${PROJECT_SOURCE_DIR}/glLoader)
-    set(OPENGL_LOADER_LIBRARIES
-        ${CMAKE_DL_LIBS})
-
+# note: perhaps rename this to be more consistent, e.g. OPENSUBDIV_USES_GLEW
+if(GLEW_FOUND)
+    add_definitions( -DOSD_USES_GLEW )
 endif()
 
 # note : (GLSL transform feedback kernels require GL 4.2)
-if(OPENGL_4_2_FOUND)
+if(GLEW_FOUND AND OPENGL_4_2_FOUND)
     add_definitions(
         -DOPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK
     )
@@ -521,7 +437,7 @@ else()
 endif()
 
 # note : (GLSL compute shader kernels require GL 4.3)
-if(OPENGL_4_3_FOUND)
+if(GLEW_FOUND AND OPENGL_4_3_FOUND)
     add_definitions(
         -DOPENSUBDIV_HAS_GLSL_COMPUTE
     )
@@ -590,28 +506,8 @@ endif()
 if(CUDA_FOUND)
     add_definitions(
         -DOPENSUBDIV_HAS_CUDA
-        -DCUDA_ENABLE_DEPRECATED=0
     )
     set(OSD_GPU TRUE)
-
-    if (UNIX)
-        list( APPEND CUDA_NVCC_FLAGS -Xcompiler -fPIC )
-        # Use OSD_CUDA_NVCC_FLAGS to specify --gpu-architecture or other CUDA
-        # compilation options. The overrides here are only for compatibility
-        # with older OpenSubdiv releases and obsolete CUDA versions.
-        if (NOT DEFINED OSD_CUDA_NVCC_FLAGS)
-            if (CUDA_VERSION_MAJOR LESS 6)
-                set( OSD_CUDA_NVCC_FLAGS --gpu-architecture compute_11 )
-            elseif (CUDA_VERSION_MAJOR LESS 8)
-                set( OSD_CUDA_NVCC_FLAGS --gpu-architecture compute_20 )
-            endif()
-        endif()
-    endif()
-
-    if (DEFINED OSD_CUDA_NVCC_FLAGS)
-        list( APPEND CUDA_NVCC_FLAGS ${OSD_CUDA_NVCC_FLAGS})
-    endif()
-
 else()
     if (NOT NO_CUDA)
         message(WARNING
@@ -624,7 +520,6 @@ endif()
 if(PTEX_FOUND)
     add_definitions(
         -DOPENSUBDIV_HAS_PTEX
-        -DPTEX_STATIC
     )
 else()
     if(NOT NO_PTEX)
@@ -637,32 +532,34 @@ else()
     endif()
 endif()
 
-if( OPENSUBDIV_GREGORY_EVAL_TRUE_DERIVATIVES )
-    add_definitions(-DOPENSUBDIV_GREGORY_EVAL_TRUE_DERIVATIVES)
+if (NOT NO_MAYA)
+    if(MAYA_FOUND)
+        add_definitions(
+            -DOPENSUBDIV_HAS_MAYA
+        )
+    else()
+        message(WARNING
+            "Maya was not found : the OpenSubdiv mayaViwer plugin will not be "
+            "available.  If you do have Maya installed and see this message, "
+            "please add your Maya path to FindMaya.cmake in "
+            "${PROJECT_SOURCE_DIR}/cmake or set it through the MAYA_LOCATION "
+            "cmake command line argument or environment variable."
+        )
+    endif()
 endif()
 
-# Link examples & regressions against Osd
-if( BUILD_SHARED_LIBS )
-    if( OSD_GPU )
-        set( OSD_LINK_TARGET osd_dynamic_gpu osd_dynamic_cpu )
-    else()
-        set( OSD_LINK_TARGET osd_dynamic_cpu )
-    endif()
+# Link examples & regressions dynamically against Osd
+if( OSD_GPU )
+    set( OSD_LINK_TARGET osd_dynamic_cpu osd_dynamic_gpu )
 else()
-    if( OSD_GPU )
-        set( OSD_LINK_TARGET osd_static_gpu osd_static_cpu )
-    else()
-        set( OSD_LINK_TARGET osd_static_cpu )
-    endif()
+    set( OSD_LINK_TARGET osd_dynamic_cpu )
 endif()
 
 if (WIN32)
-    if ("${GLEW_LIBRARY}" MATCHES "glew32s(d|)")
-        # Link against the static version of GLEW
-        add_definitions(
-            -DGLEW_STATIC
-        )
-    endif()
+    add_definitions(
+        # Link against the static version of GLEW.
+        -DGLEW_STATIC
+    )
 
     if (DXSDK_FOUND AND NOT NO_DX)
         add_definitions(
@@ -679,7 +576,7 @@ if (WIN32)
             "environment variable."
         )
     endif()
-
+    
     # Link examples & regressions statically against Osd for
     # Windows until all the kinks can be worked out.
     if( OSD_GPU )
@@ -687,7 +584,7 @@ if (WIN32)
     else()
         set( OSD_LINK_TARGET osd_static_cpu )
     endif()
-
+    
 endif()
 
 
@@ -696,18 +593,20 @@ endif()
 
 # Macro for processing public headers into the build area for doxygen processing
 
+#set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 add_custom_target( public_headers )
 
-macro(osd_add_doxy_headers headers)
+macro(_add_doxy_headers headers)
     if (NOT NO_DOC AND DOXYGEN_FOUND)
-        file(RELATIVE_PATH path "${OpenSubdiv_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}" )
+        file(RELATIVE_PATH path "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}" )
 
         string(REPLACE  "/" "_" targetpath ${path})
 
         foreach (header ${headers})
 
             set(infile "${CMAKE_CURRENT_SOURCE_DIR}/${header}")
-            set(outfile "${OpenSubdiv_BINARY_DIR}/public_headers/${path}/${header}")
+            set(outfile "${CMAKE_BINARY_DIR}/public_headers/${path}/${header}")
             set(targetname "${targetpath}_${header}")
 
             add_custom_command(
@@ -723,43 +622,28 @@ macro(osd_add_doxy_headers headers)
 
             add_custom_target(${targetname} DEPENDS "${outfile}")
 
+            #set_target_properties(${targetname} PROPERTIES FOLDER "public_headers/")
 
             list(APPEND headerfiles ${targetname} )
         endforeach()
 
-        add_dependencies( public_headers ${headerfiles} )
+        add_dependencies( public_headers DEPENDS ${headerfiles} )
     endif()
 endmacro()
 
 # Kernel Stringification
-# We want to use preprocessor include directives to include GLSL, OpenCL, etc.
+# We want to use preprocessor include directives to include GLSL and OpenCL
 # kernel source files in cpp files, but since the sources contain newline
 # characters we would need raw string literals from C++11 to do this directly.
-# To avoid depending on C++11 we instead use a small tool called "stringify"
+# To avoid depending on C++11 we instead use a small tool called "line_quote"
 # to generate source files that are suitable for direct inclusion.
-
-# We provide a Python implementation for configurability, e.g. to
-# use when cross compiling or building multi-architecture binaries.
-# We also provide a C++ binary implementation so that Python is not
-# required (for backward compatibility).
-if (OPENGL_FOUND OR OPENCL_FOUND OR DXSDK_FOUND OR METAL_FOUND)
-    if(Python_Interpreter_FOUND)
-        set(OSD_STRINGIFY_TOOL ${CMAKE_CURRENT_SOURCE_DIR}/tools/stringify/stringify.py)
-        set(OSD_STRINGIFY ${Python_EXECUTABLE} ${OSD_STRINGIFY_TOOL})
-    else()
-        set(OSD_STRINGIFY_TOOL stringify)
-        set(OSD_STRINGIFY ${OSD_STRINGIFY_TOOL})
-        set(OSD_USES_STRINGIFY_TOOL_BINARY TRUE)
-    endif()
-endif()
-
-function(osd_stringify src_files varname)
+function(_stringify src_files varname)
 
     set(inc_files "")
 
     foreach(src_file ${src_files})
 
-        string(REGEX REPLACE ".*[.](.*)" "\\1" extension "${src_file}")
+    string(REGEX REPLACE ".*[.](.*)" "\\1" extension "${src_file}")
 
         string(REGEX REPLACE "(.*)[.].*" "\\1.gen.h" inc_file "${src_file}")
         list(APPEND inc_files "${CMAKE_CURRENT_BINARY_DIR}/${inc_file}")
@@ -768,9 +652,9 @@ function(osd_stringify src_files varname)
             OUTPUT
                 "${CMAKE_CURRENT_BINARY_DIR}/${inc_file}"
             COMMAND
-                ${OSD_STRINGIFY} "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}" "${CMAKE_CURRENT_BINARY_DIR}/${inc_file}"
+                stringify "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}" "${CMAKE_CURRENT_BINARY_DIR}/${inc_file}"
             DEPENDS
-                ${OSD_STRINGIFY_TOOL} "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}"
+                stringify "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}"
         )
 
     endforeach()
@@ -778,83 +662,74 @@ function(osd_stringify src_files varname)
 endfunction()
 
 # Macro wrapper for adding a non-cuda dependent executable
-macro(osd_add_executable target folder)
+macro(_add_executable target)
 
     add_executable(${target} ${ARGN})
 
-    set_target_properties(${target} PROPERTIES FOLDER ${folder})
-
     if(CMAKE_COMPILER_IS_ICC)
         target_link_libraries(${target} ${ICC_LIBRARIES})
-    endif()
-
-    if(APPLE)
-        set_property (TARGET ${target} APPEND_STRING PROPERTY
-              COMPILE_FLAGS " -fobjc-arc ")
     endif()
 endmacro()
 
 
 # Macro for adding a cuda executable if cuda is found and a regular
 # executable otherwise.
-macro(osd_add_possibly_cuda_executable target folder)
+macro(_add_possibly_cuda_executable target)
     if(CUDA_FOUND)
         cuda_add_executable(${target} ${ARGN})
     else()
         add_executable(${target} ${ARGN})
     endif()
 
-    set_target_properties(${target} PROPERTIES FOLDER ${folder})
-
-    # Workaround link dependencies for cuda examples on platforms with GLX
-    if(CUDA_FOUND AND OpenGL_GLX_FOUND)
-        target_link_libraries(${target} OpenGL::GLX)
-    endif()
-
     if(CMAKE_COMPILER_IS_ICC)
         target_link_libraries(${target} ${ICC_LIBRARIES})
-    endif()
-
-    if(APPLE)
-        set_property (TARGET ${target} APPEND_STRING PROPERTY
-              COMPILE_FLAGS " -fobjc-arc ")
     endif()
 endmacro()
 
 
 # Macro for adding a cuda library if cuda is found and a regular
 # library otherwise.
-macro(osd_add_possibly_cuda_library target folder)
+macro(_add_possibly_cuda_library target)
     if(CUDA_FOUND)
         cuda_add_library(${target} ${ARGN})
     else()
         add_library(${target} ${ARGN})
     endif()
-    set_target_properties(${target} PROPERTIES FOLDER ${folder})
-
-    if(APPLE)
-        set_property (TARGET ${target} APPEND_STRING PROPERTY
-              COMPILE_FLAGS " -fobjc-arc ")
-    endif()
 endmacro()
 
 
 # Macro for adding a (potentially cuda) GLFW executable.
-macro(osd_add_glfw_executable target folder)
+macro(_add_glfw_executable target)
 
-    osd_add_possibly_cuda_executable(${target} ${folder} ${ARGN})
+    _add_possibly_cuda_executable(${target} ${ARGN})
 
-    if(APPLE)
-        set_property (TARGET ${target} APPEND_STRING PROPERTY
-              COMPILE_FLAGS " -fobjc-arc ")
-    endif()
+#
+# manuelk : commenting this out as it seems to be causing more problems than 
+# it is worth. Moving glfw as a native git recursive dependency will make this
+# redundant anyway.
+#
+
+#    if(WIN32)
+#        # Windows needs some of its dependency dll's copied into the same
+#        # directory as the executable.
+#        set(LIBRARIES ${GLFW_LIBRARIES})
+#        foreach (LIB ${LIBRARIES} )
+#            string(REPLACE ".lib" ".dll" DLL ${LIB})
+#            string(REPLACE ".LIB" ".DLL" DLL ${DLL})
+#            add_custom_command(
+#                TARGET ${target} POST_BUILD
+#                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#                    ${DLL}
+#                    $<TARGET_FILE_DIR:${target}>
+#            )
+#        endforeach()
+#    endif()
 
 endmacro()
 
 #-------------------------------------------------------------------------------
 # Build targets
 
-include(GNUInstallDirs)
 
 # if you want to build examples against installed OpenSubdiv header files,
 # use OPENSUBDIV_INCLUDE_DIR.
@@ -863,24 +738,16 @@ include(GNUInstallDirs)
 # set (OPENSUBDIV_INCLUDE_DIR ${CMAKE_INSTALL_PREFIX}/${CMAKE_INCDIR_BASE})
 
 if (NOT OPENSUBDIV_INCLUDE_DIR)
-    set(OPENSUBDIV_INCLUDE_DIR "${PROJECT_SOURCE_DIR}")
+    set(OPENSUBDIV_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/opensubdiv")
 endif()
 
 if (NOT NO_TESTS)
     enable_testing()
 endif()
 
-if (NOT NO_OPENGL)
-    add_subdirectory(glLoader)
-endif()
-
-if (OSD_USES_STRINGIFY_TOOL_BINARY)
-    add_subdirectory(tools/stringify)
-endif()
-
 add_subdirectory(opensubdiv)
 
-if (NOT ANDROID) # XXXdyu
+if (NOT ANDROID AND NOT IOS) # XXXdyu
     add_subdirectory(regression)
 endif()
 
@@ -895,32 +762,3 @@ endif()
 if (NOT NO_DOC)
     add_subdirectory(documentation)
 endif()
-
-#
-# CMake Config.
-#
-include(CMakePackageConfigHelpers)
-
-set(OPENSUBDIV_CONFIG_PATH "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
-
-configure_package_config_file(
-    opensubdiv-config.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/OpenSubdivConfig.cmake
-    INSTALL_DESTINATION ${OPENSUBDIV_CONFIG_PATH}
-)
-write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/OpenSubdivConfigVersion.cmake
-    VERSION ${OSD_SONAME}
-    COMPATIBILITY SameMajorVersion
-)
-
-install(EXPORT opensubdiv-targets
-    NAMESPACE OpenSubdiv::
-    FILE OpenSubdivTargets.cmake
-    DESTINATION ${OPENSUBDIV_CONFIG_PATH})
-
-install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/OpenSubdivConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/OpenSubdivConfigVersion.cmake
-    DESTINATION ${OPENSUBDIV_CONFIG_PATH}
-)

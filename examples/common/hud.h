@@ -31,28 +31,15 @@
 #include <string>
 #include <vector>
 
-#define OSD_HUD_USE_FUNCTION_POINTERS (__cplusplus <= 199711L)
-
-#if !OSD_HUD_USE_FUNCTION_POINTERS
-#include <functional>
-#endif
-
 #include "hud.h"
 
 class Hud
 {
 public:
-#if OSD_HUD_USE_FUNCTION_POINTERS
     typedef void (*RadioButtonCallback)(int c);
     typedef void (*CheckBoxCallback)(bool checked, int data);
     typedef void (*SliderCallback)(float value, int data);
     typedef void (*PullDownCallback)(int value);
-#else
-    typedef std::function<void(int)> RadioButtonCallback;
-    typedef std::function<void(bool,int)> CheckBoxCallback;
-    typedef std::function<void(float, int)> SliderCallback;
-    typedef std::function<void(int)> PullDownCallback;
-#endif
 
     Hud();
     virtual ~Hud();
@@ -140,12 +127,11 @@ protected:
         bool intStep;
 
         void SetValue(float v) {
-            v = std::max(std::min(v, max), min);
+            value = std::max(std::min(v, max), min);
             if (intStep) {
                 // MSVC 2010 does not have std::round() or roundf()
-                v = v>0.0f ? floorf(v+0.5f) : ceilf(v-0.5f);
+                value = v>0.0f ? floor(v+0.5f) : ceil(v-0.5f);
             }
-            value = v;
         }
     };
 
@@ -159,7 +145,7 @@ protected:
         PullDownCallback callback;
 
         void SetSelected(int idx) {
-            if (idx>=0 && idx<(int)labels.size()) {
+            if (idx>=0 and idx<(int)labels.size()) {
                 selected=idx;
             }
         }

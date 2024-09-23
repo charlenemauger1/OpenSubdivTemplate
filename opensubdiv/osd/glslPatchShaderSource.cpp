@@ -34,21 +34,6 @@ namespace Osd {
 static const char *commonShaderSource =
 #include "glslPatchCommon.gen.h"
 ;
-static const char *commonTessShaderSource =
-#include "glslPatchCommonTess.gen.h"
-;
-static const char *patchLegacyShaderSource =
-#include "glslPatchLegacy.gen.h"
-;
-static const char *patchBasisTypesShaderSource =
-#include "patchBasisTypes.gen.h"
-;
-static const char *patchBasisShaderSource =
-#include "patchBasis.gen.h"
-;
-static const char *boxSplineTriangleShaderSource =
-#include "glslPatchBoxSplineTriangle.gen.h"
-;
 static const char *bsplineShaderSource =
 #include "glslPatchBSpline.gen.h"
 ;
@@ -58,38 +43,11 @@ static const char *gregoryShaderSource =
 static const char *gregoryBasisShaderSource =
 #include "glslPatchGregoryBasis.gen.h"
 ;
-static const char *gregoryTriangleShaderSource =
-#include "glslPatchGregoryTriangle.gen.h"
-;
-
-/*static*/
-std::string
-GLSLPatchShaderSource::GetPatchDrawingShaderSource() {
-    std::stringstream ss;
-    ss << std::string(commonShaderSource);
-    ss << std::string(commonTessShaderSource);
-    return ss.str();
-}
 
 /*static*/
 std::string
 GLSLPatchShaderSource::GetCommonShaderSource() {
-    std::stringstream ss;
-    ss << GetPatchDrawingShaderSource();
-    ss << std::string(patchLegacyShaderSource);
-    return ss.str();
-}
-
-/*static*/
-std::string
-GLSLPatchShaderSource::GetPatchBasisShaderSource() {
-    std::stringstream ss;
-#if defined(OPENSUBDIV_GREGORY_EVAL_TRUE_DERIVATIVES)
-    ss << "#define OPENSUBDIV_GREGORY_EVAL_TRUE_DERIVATIVES\n";
-#endif
-    ss << std::string(patchBasisTypesShaderSource);
-    ss << std::string(patchBasisShaderSource);
-    return ss.str();
+    return std::string(commonShaderSource);
 }
 
 /*static*/
@@ -101,11 +59,6 @@ GLSLPatchShaderSource::GetVertexShaderSource(Far::PatchDescriptor::Type type) {
         ss << "#define OSD_PATCH_BSPLINE\n"
            << "#define OSD_PATCH_VERTEX_BSPLINE_SHADER\n"
            << bsplineShaderSource;
-        break;
-    case Far::PatchDescriptor::LOOP:
-        ss << "#define OSD_PATCH_BOX_SPLINE_TRIANGLE\n"
-           << "#define OSD_PATCH_VERTEX_BOX_SPLINE_TRIANGLE_SHADER\n"
-           << boxSplineTriangleShaderSource;
         break;
     case Far::PatchDescriptor::GREGORY:
         ss << "#define OSD_PATCH_GREGORY\n"
@@ -121,11 +74,6 @@ GLSLPatchShaderSource::GetVertexShaderSource(Far::PatchDescriptor::Type type) {
         ss << "#define OSD_PATCH_GREGORY_BASIS\n"
            << "#define OSD_PATCH_VERTEX_GREGORY_BASIS_SHADER\n"
            << gregoryBasisShaderSource;
-        break;
-    case Far::PatchDescriptor::GREGORY_TRIANGLE:
-        ss << "#define OSD_PATCH_GREGORY_TRIANGLE\n"
-           << "#define OSD_PATCH_VERTEX_GREGORY_TRIANGLE_SHADER\n"
-           << gregoryTriangleShaderSource;
         break;
     default:
         break;  // returns empty (points, lines, quads, ...)
@@ -144,11 +92,6 @@ GLSLPatchShaderSource::GetTessControlShaderSource(
            << "#define OSD_PATCH_TESS_CONTROL_BSPLINE_SHADER\n"
            << bsplineShaderSource;
         break;
-    case Far::PatchDescriptor::LOOP:
-        ss << "#define OSD_PATCH_BOX_SPLINE_TRIANGLE\n"
-           << "#define OSD_PATCH_TESS_CONTROL_BOX_SPLINE_TRIANGLE_SHADER\n"
-           << boxSplineTriangleShaderSource;
-        break;
     case Far::PatchDescriptor::GREGORY:
         ss << "#define OSD_PATCH_GREGORY\n"
            << "#define OSD_PATCH_TESS_CONTROL_GREGORY_SHADER\n"
@@ -163,11 +106,6 @@ GLSLPatchShaderSource::GetTessControlShaderSource(
         ss << "#define OSD_PATCH_GREGORY_BASIS\n"
            << "#define OSD_PATCH_TESS_CONTROL_GREGORY_BASIS_SHADER\n"
            << gregoryBasisShaderSource;
-        break;
-    case Far::PatchDescriptor::GREGORY_TRIANGLE:
-        ss << "#define OSD_PATCH_GREGORY_TRIANGLE\n"
-           << "#define OSD_PATCH_TESS_CONTROL_GREGORY_TRIANGLE_SHADER\n"
-           << gregoryTriangleShaderSource;
         break;
     default:
         break;  // returns empty (points, lines, quads, ...)
@@ -186,11 +124,6 @@ GLSLPatchShaderSource::GetTessEvalShaderSource(
            << "#define OSD_PATCH_TESS_EVAL_BSPLINE_SHADER\n"
            << bsplineShaderSource;
         break;
-    case Far::PatchDescriptor::LOOP:
-        ss << "#define OSD_PATCH_BOX_SPLINE_TRIANGLE\n"
-           << "#define OSD_PATCH_TESS_EVAL_BOX_SPLINE_TRIANGLE_SHADER\n"
-           << boxSplineTriangleShaderSource;
-        break;
     case Far::PatchDescriptor::GREGORY:
         ss << "#define OSD_PATCH_GREGORY\n"
            << "#define OSD_PATCH_TESS_EVAL_GREGORY_SHADER\n"
@@ -205,11 +138,6 @@ GLSLPatchShaderSource::GetTessEvalShaderSource(
         ss << "#define OSD_PATCH_GREGORY_BASIS\n"
            << "#define OSD_PATCH_TESS_EVAL_GREGORY_BASIS_SHADER\n"
            << gregoryBasisShaderSource;
-        break;
-    case Far::PatchDescriptor::GREGORY_TRIANGLE:
-        ss << "#define OSD_PATCH_GREGORY_TRIANGLE\n"
-           << "#define OSD_PATCH_TESS_EVAL_GREGORY_TRIANGLE_SHADER\n"
-           << gregoryTriangleShaderSource;
         break;
     default:
         break;  // returns empty (points, lines, quads, ...)

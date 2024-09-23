@@ -22,8 +22,6 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
-
 #include <sstream>
 #include <string>
 #include <cstring>
@@ -41,10 +39,12 @@
 
 namespace GLUtils {
 
-void InitializeGL()
-{
-    OpenSubdiv::internal::GLLoader::applicationInitializeGL();
-}
+// Note that glewIsSupported is required here for Core profile, glewGetExtension
+// and GLEW_extension_name will not work on all drivers.
+#ifdef OSD_USES_GLEW
+#define IS_SUPPORTED(x) \
+   (glewIsSupported(x) == GL_TRUE)
+#endif
 
 static void
 _argParseBool(bool *ret, const char *lbl, int i, int argc, char **argv)
@@ -125,6 +125,7 @@ SetMinimumGLVersion(int argc, char ** argv) {
         }
     }
 
+#ifdef CORE_PROFILE
     if (coreProfile) {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     }
@@ -132,6 +133,7 @@ SetMinimumGLVersion(int argc, char ** argv) {
     if (forwardCompat) {
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     }
+#endif
 
     if (versionSet) {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, major);
@@ -145,14 +147,12 @@ PrintGLVersion() {
     std::cout << glGetString(GL_RENDERER) << "\n";
     std::cout << glGetString(GL_VERSION) << "\n";
 
-    int i = -1;
+    int i;
     std::cout << "Init OpenGL ";
     glGetIntegerv(GL_MAJOR_VERSION, &i);
     std::cout << i << ".";
     glGetIntegerv(GL_MINOR_VERSION, &i);
     std::cout << i << "\n";
-
-    CheckGLErrors("PrintGLVersion");
 }
 
 void
@@ -201,6 +201,20 @@ WriteScreenshot(int width, int height) {
     fprintf(stdout, "Saved %s\n", fname);
 }
 
+
+bool
+SupportsAdaptiveTessellation() {
+#ifdef OSD_USES_GLEW
+    return IS_SUPPORTED("GL_ARB_tessellation_shader");
+#else
+#if defined(GL_ARB_tessellation_shader) || defined(GL_VERSION_4_0)
+    return true;
+#else
+    return false;
+#endif
+#endif
+}
+
 void GetMajorMinorVersion(int *major, int *minor){
     const GLubyte *ver = glGetString(GL_SHADING_LANGUAGE_VERSION);
     if (!ver){
@@ -246,54 +260,39 @@ GetShaderVersion(){
     return shader_version;
 }
 
-// Generates the version definition needed by the glsl shaders based on the
-// opengl string
+/* Generates the version defintion needed by the glsl shaders based on the 
+ * opengl string
+*/
 std::string GetShaderVersionInclude(){
     return "#version " + GetShaderVersion() + "\n";
 }
 
-bool SupportsAdaptiveTessellation() {
-#if defined(GL_VERSION_4_0)
-    if (OSD_OPENGL_HAS(VERSION_4_0)) {
-        return true;
-    }
-#endif
-#if defined(GL_ARB_tessellation_shader)
-    if (OSD_OPENGL_HAS(ARB_tessellation_shader)) {
-        return true;
-    }
-#endif
+bool GL_ARBSeparateShaderObjectsOrGL_VERSION_4_1(){
+#if defined(OSD_USES_GLEW)
+    return IS_SUPPORTED("GL_ARB_separate_shader_objects") ||
+            (GLEW_VERSION_4_1 && IS_SUPPORTED("GL_ARB_tessellation_shader"));
+#else
+#if defined(GL_ARB_separate_shader_objects) || defined(GL_VERSION_4_1)
+    return true;
+#else
     return false;
-}
-
-bool GL_ARBSeparateShaderObjectsOrGL_VERSION_4_1() {
-#if defined(GL_VERSION_4_1)
-    if (OSD_OPENGL_HAS(VERSION_4_1)) {
-        return true;
-    }
 #endif
-#if defined(GL_ARB_separate_shader_objects)
-    if (OSD_OPENGL_HAS(ARB_separate_shader_objects)) {
-        return true;
-    }
 #endif
-    return false;
 }
 
 bool GL_ARBComputeShaderOrGL_VERSION_4_3() {
-#if defined(GL_VERSION_4_3)
-    if (OSD_OPENGL_HAS(VERSION_4_3)) {
-        return true;
-    }
-#endif
-#if defined(GL_ARB_compute_shader)
-    if (OSD_OPENGL_HAS(ARB_compute_shader)) {
-        return true;
-    }
-#endif
+#if defined(OSD_USES_GLEW)
+    return IS_SUPPORTED("GL_ARB_compute_shader") ||
+           (GLEW_VERSION_4_3);
+#else
+#if defined(GL_ARB_compute_shader) || defined(GL_VERSION_4_3)
+    return true;
+#else
     return false;
+#endif
+#endif
 }
 
 #undef IS_SUPPORTED
 
-}   // namespace GLUtils
+}   // namesapce GLUtils

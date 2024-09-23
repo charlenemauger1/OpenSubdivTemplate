@@ -24,42 +24,62 @@
 
 add_subdirectory(common)
 
-if (OPENGL_FOUND AND GLFW_FOUND)
+if (NOT NO_OPENGL)
+    if (OPENGL_FOUND AND (GLEW_FOUND AND GLFW_FOUND) OR (APPLE AND GLFW_FOUND))
 
-    add_subdirectory(glViewer)
-    add_subdirectory(glEvalLimit)
-    add_subdirectory(glShareTopology)
-    add_subdirectory(glFVarViewer)
-    add_subdirectory(glStencilViewer)
-    add_subdirectory(glImaging)
-    add_subdirectory(farViewer)
+        add_subdirectory(glViewer)
+        add_subdirectory(glEvalLimit)
+        add_subdirectory(glShareTopology)
+        add_subdirectory(glFVarViewer)
+        add_subdirectory(glStencilViewer)
+        add_subdirectory(glImaging)
+        add_subdirectory(farViewer)
 
-    if (OPENGL_4_2_FOUND)
-        add_subdirectory(glPaintTest)
+        if (OPENGL_4_3_FOUND AND (NOT APPLE))
+            add_subdirectory(glPaintTest)
+        endif()
+
+        if (PTEX_FOUND)
+            add_subdirectory(glPtexViewer)
+        endif()
+
+    else()
+
+        set(MISSING "")
+
+        if (NOT OPENGL_FOUND)
+            list(APPEND MISSING OpenGL)
+        endif()
+
+        if (NOT GLEW_FOUND)
+            list(APPEND MISSING glew)
+        endif()
+
+        if (NOT GLFW_FOUND)
+            list(APPEND MISSING glfw)
+        endif()
+
+        message(WARNING
+            "The following libraries could not be found : ${MISSING}.  "
+            "The glViewer and ptexViewer examples will not be available.  "
+            "If you have these libraries installed, please specify their "
+            "path to cmake (through the GLEW_LOCATION and GLFW_LOCATION "
+            "command line arguments or environment variables)."
+        )
     endif()
-
-    if (PTEX_FOUND AND ZLIB_FOUND)
-        add_subdirectory(glPtexViewer)
-    endif()
-
 endif()
 
 if (DXSDK_FOUND AND NOT NO_DX)
 
    add_subdirectory(dxViewer)
 
-   if (PTEX_FOUND AND ZLIB_FOUND)
+   if (PTEX_FOUND)
        add_subdirectory(dxPtexViewer)
    endif()
 
 endif()
 
-if (METAL_FOUND AND NOT NO_METAL)
 
-    add_subdirectory(mtlViewer)
-
-    if(PTEX_FOUND)
-        add_subdirectory(mtlPtexViewer)
-    endif()
-
+if (MAYA_FOUND AND (NOT NO_MAYA))
+    add_subdirectory(mayaPolySmooth)
 endif()

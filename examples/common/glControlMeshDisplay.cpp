@@ -22,10 +22,8 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#include "glLoader.h"
-
 #include "glControlMeshDisplay.h"
-#include "glUtils.h"
+#include "../common/glUtils.h"
 
 #include <vector>
 

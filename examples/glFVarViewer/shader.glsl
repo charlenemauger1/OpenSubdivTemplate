@@ -166,42 +166,6 @@ out block {
     OSD_USER_VARYING_DECLARE
 } outpt;
 
-uniform isamplerBuffer OsdFVarParamBuffer;
-layout(std140) uniform OsdFVarArrayData {
-    OsdPatchArray fvarPatchArray[2];
-};
-
-vec2
-interpolateFaceVarying(vec2 uv, int fvarOffset)
-{
-    int patchIndex = OsdGetPatchIndex(gl_PrimitiveID);
-
-    OsdPatchArray array = fvarPatchArray[0];
-
-    ivec3 fvarPatchParam = texelFetch(OsdFVarParamBuffer, patchIndex).xyz;
-    OsdPatchParam param = OsdPatchParamInit(fvarPatchParam.x,
-                                            fvarPatchParam.y,
-                                            fvarPatchParam.z);
-
-    int patchType = OsdPatchParamIsRegular(param) ? array.regDesc : array.desc;
-
-    float wP[20], wDu[20], wDv[20], wDuu[20], wDuv[20], wDvv[20];
-    int numPoints = OsdEvaluatePatchBasisNormalized(patchType, param,
-                uv.s, uv.t, wP, wDu, wDv, wDuu, wDuv, wDvv);
-
-    int primOffset = patchIndex * array.stride;
-
-    vec2 result = vec2(0);
-    for (int i=0; i<numPoints; ++i) {
-        int index = (primOffset+i)*OSD_FVAR_WIDTH + fvarOffset;
-        vec2 cv = vec2(texelFetch(OsdFVarDataBuffer, index).s,
-                       texelFetch(OsdFVarDataBuffer, index + 1).s);
-        result += wP[i] * cv;
-    }
-
-    return result;
-}
-
 void emit(int index, vec3 normal)
 {
     outpt.v.position = inpt[index].v.position;
@@ -211,22 +175,21 @@ void emit(int index, vec3 normal)
     outpt.v.normal = normal;
 #endif
 
+#ifdef LOOP  // ----- scheme : LOOP
+    vec2 uv;
+    OSD_COMPUTE_FACE_VARYING_TRI_2(uv, /*fvarOffste=*/0, index);
+
+#else        // ----- scheme : CATMARK / BILINEAR
+
 #ifdef SHADING_FACEVARYING_UNIFORM_SUBDIVISION
-    // interpolate fvar data at refined tri or quad vertex locations
-#ifdef PRIM_TRI
-    vec2 trist[3] = vec2[](vec2(0,0), vec2(1,0), vec2(0,1));
-    vec2 st = trist[index];
-#endif
-#ifdef PRIM_QUAD
     vec2 quadst[4] = vec2[](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1));
     vec2 st = quadst[index];
-#endif
 #else
-    // interpolate fvar data at tessellated vertex locations
     vec2 st = inpt[index].v.tessCoord;
 #endif
-
-    vec2 uv = interpolateFaceVarying(st, /*fvarOffset*/0);
+    vec2 uv;
+    OSD_COMPUTE_FACE_VARYING_2(uv, /*fvarOffset=*/0, st);
+#endif      // ------ scheme
 
     outpt.color = vec3(uv.s, uv.t, 0);
 

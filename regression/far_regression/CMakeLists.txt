@@ -32,7 +32,7 @@ set(PLATFORM_LIBRARIES
     "${OSD_LINK_TARGET}"
 )
 
-osd_add_executable(far_regression "regression"
+_add_executable(far_regression
     ${SOURCE_FILES}
     $<TARGET_OBJECTS:sdc_obj>
     $<TARGET_OBJECTS:vtr_obj>

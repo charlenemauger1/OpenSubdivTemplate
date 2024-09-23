@@ -34,7 +34,7 @@ namespace OPENSUBDIV_VERSION {
 namespace Osd {
 
 ///
-/// \brief Concrete vertex buffer class for OpenCL subdivision.
+/// \brief Concrete vertex buffer class for OpenCL subvision.
 ///
 /// CLVertexBuffer implements CLVertexBufferInterface. An instance of this
 /// buffer class can be passed to CLEvaluator

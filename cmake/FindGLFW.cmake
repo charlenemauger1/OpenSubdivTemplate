@@ -30,19 +30,6 @@
 # GLFW_LIBRARIES
 #
 
-if(NOT NO_GLFW_X11)
-    set(GLFW_X11_INCLUDE_DIRS
-            "/usr/X11R6/include"
-            "/usr/include/X11"
-        )
-    set(GLFW_X11_LIB_DIRS
-            "/usr/X11R6/lib"
-        )
-else()
-    set(GLFW_X11_INCLUDE_DIRS "")
-    set(GLFW_X11_LIB_DIRS "")
-endif()
-
 find_path( GLFW_INCLUDE_DIR 
     NAMES
         GLFW/glfw3.h
@@ -54,7 +41,8 @@ find_path( GLFW_INCLUDE_DIR
         "${OPENGL_INCLUDE_DIR}"
         /usr/openwin/share/include
         /usr/openwin/include
-        "${GLFW_X11_INCLUDE_DIRS}"
+        /usr/X11R6/include
+        /usr/include/X11
         /opt/graphics/OpenGL/include
         /opt/graphics/OpenGL/contrib/libglfw
         /usr/local/include
@@ -78,7 +66,8 @@ find_path( GLFW_INCLUDE_DIR
         "${OPENGL_INCLUDE_DIR}"
         /usr/openwin/share/include
         /usr/openwin/include
-        "${GLFW_X11_INCLUDE_DIRS}"
+        /usr/X11R6/include
+        /usr/include/X11
         /opt/graphics/OpenGL/include
         /opt/graphics/OpenGL/contrib/libglfw
         /usr/local/include
@@ -102,7 +91,7 @@ if (WIN32)
                 /usr/lib
                 /usr/lib/w32api
                 /usr/local/lib
-                "${GLFW_X11_LIB_DIRS}"
+                /usr/X11R6/lib
             DOC 
                 "The GLFW library"
         )
@@ -151,31 +140,25 @@ else ()
         
         find_package(Threads REQUIRED)
 
-        if(NOT NO_GLFW_X11)
-            find_package(X11 REQUIRED)
+        find_package(X11 REQUIRED)
+        
+        if(NOT X11_Xrandr_FOUND)
+            message(FATAL_ERROR "Xrandr library not found - required for GLFW")
+        endif()
 
-            if(NOT X11_Xrandr_FOUND)
-                message(FATAL_ERROR "Xrandr library not found - required for GLFW")
-            endif()
+        if(NOT X11_xf86vmode_FOUND)
+            message(FATAL_ERROR "xf86vmode library not found - required for GLFW")
+        endif()
 
-            if(NOT X11_xf86vmode_FOUND)
-                message(FATAL_ERROR "xf86vmode library not found - required for GLFW")
-            endif()
+        if(NOT X11_Xcursor_FOUND)
+            message(FATAL_ERROR "Xcursor library not found - required for GLFW")
+        endif()
 
-            if(NOT X11_Xcursor_FOUND)
-                message(FATAL_ERROR "Xcursor library not found - required for GLFW")
-            endif()
+        if(NOT X11_Xinerama_FOUND)
+            message(FATAL_ERROR "Xinerama library not found - required for GLFW")
+        endif()
 
-            if(NOT X11_Xinerama_FOUND)
-                message(FATAL_ERROR "Xinerama library not found - required for GLFW")
-            endif()
-
-            if(NOT X11_Xi_FOUND)
-                message(FATAL_ERROR "Xi library not found - required for GLFW")
-            endif()
-
-            list(APPEND GLFW_x11_LIBRARY "${X11_Xrandr_LIB}" "${X11_Xxf86vm_LIB}" "${X11_Xcursor_LIB}" "${X11_Xinerama_LIB}" "${X11_Xi_LIB}" "${X11_LIBRARIES}" "${CMAKE_THREAD_LIBS_INIT}" -lrt -ldl)
-        endif (NOT NO_GLFW_X11)
+        list(APPEND GLFW_x11_LIBRARY "${X11_Xrandr_LIB}" "${X11_Xxf86vm_LIB}" "${X11_Xcursor_LIB}" "${X11_Xinerama_LIB}" "${CMAKE_THREAD_LIBS_INIT}" -lrt -lXi)
 
         find_library( GLFW_glfw_LIBRARY
             NAMES 
@@ -194,7 +177,7 @@ else ()
                 /usr/local/lib
                 /usr/local/lib/${CMAKE_LIBRARY_ARCHITECTURE}
                 /usr/openwin/lib
-                "${GLFW_X11_LIB_DIRS}"
+                /usr/X11R6/lib
             DOC 
                 "The GLFW library"
         )

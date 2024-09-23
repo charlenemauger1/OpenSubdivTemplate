@@ -22,39 +22,45 @@
 #   language governing permissions and limitations under the Apache License.
 #
 
-# *** glShareTopology ***
+# *** topologySharing ***
 
 set(SHADER_FILES
      shader.glsl
 )
 
+list(APPEND PLATFORM_LIBRARIES
+    "${OSD_LINK_TARGET}"
+    "${OPENGL_LIBRARY}"
+    "${GLFW_LIBRARIES}"
+)
+
 include_directories(
     "${OPENSUBDIV_INCLUDE_DIR}"
-    "${OPENGL_LOADER_INCLUDE_DIRS}"
     "${GLFW_INCLUDE_DIR}"
 )
 
-list(APPEND PLATFORM_LIBRARIES
-    "${OSD_LINK_TARGET}"
-    "${OPENGL_LOADER_LIBRARIES}"
-    "${GLFW_LIBRARIES}"
-)
+if ( GLEW_FOUND )
+    include_directories("${GLEW_INCLUDE_DIR}")
+    list(APPEND PLATFORM_LIBRARIES "${GLEW_LIBRARY}")
+endif()
 
 if( OPENCL_FOUND )
     include_directories("${OPENCL_INCLUDE_DIRS}")
 endif()
 
-osd_stringify("${SHADER_FILES}" INC_FILES)
+#-------------------------------------------------------------------------------
+
+_stringify("${SHADER_FILES}" INC_FILES)
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
-osd_add_glfw_executable(glShareTopology "examples"
+_add_glfw_executable(glShareTopology
     glShareTopology.cpp
     sceneBase.cpp
     "${SHADER_FILES}"
     "${INC_FILES}"
     $<TARGET_OBJECTS:regression_common_obj>
-    $<TARGET_OBJECTS:examples_common_gl_obj>
+    $<TARGET_OBJECTS:examples_common_obj>
 )
 
 target_link_libraries(glShareTopology
