@@ -91,8 +91,9 @@ struct LimitFrame {
 
 using namespace OpenSubdiv;
 
-Far::TopologyRefiner* createTopologyRefiner(float* g_verts);
+Far::TopologyRefiner* createTopologyRefiner(float* g_verts, const char* input_file);
 
+void export_subdivived_mesh(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts);
 
 //------------------------------------------------------------------------------
 int main(int, char**) {
@@ -101,96 +102,17 @@ int main(int, char**) {
 
 	float g_verts[100000];
 
-
-	Far::TopologyRefiner* refiner = createTopologyRefiner(g_verts);
-	ofstream myfile;
-	myfile.open("C:\\Users\\charl\\Desktop\\bi-a_model.obj");
-	/*Far::Index crease[10] = {0,3,12,14,17,18,21,30,32,35};
-
-	for (int i = 0; i < 10; i++)
-	{
-	refiner->_levels[0]->_vertTags[(Far::Index)(crease[i])]._rule = Sdc::Crease::RULE_CORNER;
-	}*/
-
-	// Toy problem
-
-	//Far::Index crease[16] = { 5,25,7,27,6,26,3,23,24,28,29,30,8,4,9,10 };
-	//for (int i = 0; i < 16; i++)
-	//{
-	//	refiner->_levels[0]->_vertTags[(Far::Index)(crease[i])]._rule = Sdc::Crease::RULE_CREASE;
-	//}
-
-	// biventricular model
-	//Vtr::internal::Level::VTag vtag = refiner->_levels[0]->getVertexTag((Far::Index)(0));    // to get the Tag for a smooth vertex 90
-	//Vtr::internal::Level::ETag etag = refiner->_levels[0]->getEdgeTag(refiner->_levels[0]->findEdge((Far::Index)(90), (Far::Index)(69))); // assign smooth edge 69,90
-
-
-	/*Far::Index tab_ventricle1[21] = { 98,93,102,95,100,118,117,106,92,91,83,128,24,88,87,85,86,89,116,97,98 };
-	Far::Index tab_ventricle2[21] = { 82,127,84,81,65,23,74,22,112,17,27,119,122,120,121,104,105,49,50,44,82 };
-
-	//Far::Index tab_epi[11] = { 329,328,290,288};// 309, 288, 287, 315, 315, 336, 329, 328
-
-	Far::Index tab_epi[11] = { 328,290,321 };// 309, 288, 287, 315, 315, 336, 329, 328};
-	Far::ConstIndexArray array1;
-	Far::ConstIndexArray array2;*/
-	//Far::ConstIndexArray array1;
-
-
-	//Vtr::internal::Level::VTag vtag = refiner->_levels[0]->getVertexTag((Far::Index)(105));
-
-	// mitral 
-	/*Vtr::internal::Level::VTag vtag = refiner->_levels[0]->getVertexTag((Far::Index)(20));
-	refiner->_levels[0]->_vertTags[(Far::Index)(1)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(2)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(53)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(3)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(4)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(56)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(32)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(67)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(20)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(5)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(21)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(69)] = vtag;
-
-	refiner->_levels[0]->_vertTags[(Far::Index)(199)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(206)] = vtag;
-	refiner->_levels[0]->_vertTags[(Far::Index)(192)] = vtag;
-
-
-	array1 = refiner->_levels[0]->getVertexEdges((Far::Index)(109));
-	Vtr::internal::Level::ETag etag = refiner->_levels[0]->getEdgeTag(array1[0]);
-
-	float v = refiner->_levels[0]->getVertexSharpness((Far::Index)(127));
-	float e = refiner->_levels[0]->getEdgeSharpness((Far::Index)(array1[0]));
-
-	for (int i = 0; i < refiner->_levels[0]->getNumVertices(); i++)
-	{
-		if (refiner->_levels[0]->getNumVertexEdges((Far::Index)(i)) > 3) // extraordinary vertex
-		{
-			refiner->_levels[0]->_vertTags[(Far::Index)(i)] = refiner->_levels[0]->getVertexTag((Far::Index)(127)); //205
-			refiner->_levels[0]->setVertSmooth((Far::Index)(i), v); // set sharpness a zero
-
-			array1 = refiner->_levels[0]->getVertexEdges((Far::Index)(i));
-			refiner->_levels[0]->_edgeTags[(Far::Index)(array1[0])] = etag;
-			refiner->_levels[0]->_edgeTags[(Far::Index)(array1[1])] = etag;
-			refiner->_levels[0]->_edgeTags[(Far::Index)(array1[2])] = etag;
-			refiner->_levels[0]->_edgeTags[(Far::Index)(array1[3])] = etag;
-
-			refiner->_levels[0]->setEdgeSmooth(array1[0], e);
-			refiner->_levels[0]->setEdgeSmooth(array1[1], e);
-			refiner->_levels[0]->setEdgeSmooth(array1[2], e);
-			refiner->_levels[0]->setEdgeSmooth(array1[3], e);
-
-		}
-	}*/
-
+	// Move to config
 	int maxlevel = 2; // 2 subdivision levels
+	const char* input_file = "C:\\Users\\charl\\Desktop\\bi-a_model.obj";
+	const char* output_mesh = "C:\\Users\\charl\\Desktop\\bi-a_model-sub.obj";
 
+	Far::TopologyRefiner* refiner = createTopologyRefiner(g_verts, input_file);
 
 	refiner->RefineUniform(Far::TopologyRefiner::UniformOptions(maxlevel));   // Refine the topology RefineUniform
 	cout << "refinement " << endl;
-	//refiner->RefineAdaptive(Far::TopologyRefiner::AdaptiveOptions(maxlevel));
+
+	export_subdivived_mesh(refiner, output_mesh, g_verts);
 
 	// PatchTable
 	// ---------------------
@@ -409,25 +331,6 @@ int main(int, char**) {
 			array[i][j] = 0.0;
 
 
-	// calcul uniquement des poids et des indices	cout << "creation of the table" << endl;
-	/*for (int i = 0; i < stencilTable->GetNumStencils(); i++)
-	{
-	Stencil = stencilTable->GetStencil((Far::Index)(i));
-	int size = Stencil.GetSize();
-	indices = Stencil.GetVertexIndices();
-	weights = Stencil.GetWeights();
-
-
-	for (int j = 0; j < size; j++)
-	mytable << weights[j] << ' ';
-
-	mytable << ' ' ;
-	for (int k = 0; k < size; k++)
-	mytable << indices[k] << ' ';
-	mytable << endl;
-	}*/
-
-
 	for (int i = 0; i < stencilTable->GetNumStencils(); i++)
 	{
 		Stencil = stencilTable->GetStencil((Far::Index)(i));
@@ -455,52 +358,6 @@ int main(int, char**) {
 	}
 	mytable.close();
 
-	// Allocate vertex primvar buffer (1 stencil for each vertex)
-	cout << "Allocate vertex primvar buffer" << endl;
-	int nstencils = stencilTable->GetNumStencils();
-	std::vector<Vertex> vertexBuffer(nstencils);
-
-	Vertex* controlValues = reinterpret_cast<Vertex*>(g_verts);
-
-	{
-		stencilTable->UpdateValues(controlValues, &vertexBuffer[0]);             //Updates point values based on the control values
-	}
-
-	cout << "ecriture..." << endl;
-	if (myfile.is_open())
-	{
-		Far::TopologyLevel const& refLastLevel = refiner->GetLevel(maxlevel);
-		int nfaces = refLastLevel.GetNumFaces();
-
-		// print the vertex position
-		for (int i = 0; i < (int)vertexBuffer.size(); ++i)
-		{
-			float const* pos = vertexBuffer[i].GetPosition();
-
-			myfile << "v " << pos[0] << " " << pos[1] << " " << pos[2] << "\n";
-		}
-
-		// Print faces
-		for (int face = 0; face < nfaces; ++face)
-		{
-
-			Far::ConstIndexArray fverts = refLastLevel.GetFaceVertices(face);
-
-
-			myfile << "f ";
-			for (int vert = 0; vert < fverts.size(); ++vert)
-			{
-				myfile << fverts[vert] + 1 << " "; // OBJ uses 1-based arrays...
-			}
-			myfile << "\n";
-		}
-		myfile.close();
-	}
-	else std::cout << "Unable to open file";
-
-
-	std::printf("Time taken: %.2fs\n", (double)(clock() - tStart) / CLOCKS_PER_SEC);
-
 
 	delete refiner;
 	delete stencilTable;
@@ -509,15 +366,62 @@ int main(int, char**) {
 
 //------------------------------------------------------------------------------
 
-Far::TopologyRefiner * createTopologyRefiner(float *g_verts)
+void export_subdivived_mesh(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts)
+{	
+	ofstream output_file;
+	output_file.open(output_obj);
+
+	Far::StencilTableFactory::Options options;
+	options.generateIntermediateLevels = false;
+	options.generateOffsets = true;
+	Far::StencilTable const* stencil_table = Far::StencilTableFactory::Create(*refiner, options);
+
+	// Allocate vertex primvar buffer (1 stencil for each vertex)
+	int nstencils = stencil_table->GetNumStencils();
+	std::vector<Vertex> vertexBuffer(nstencils);
+
+	Vertex* controlValues = reinterpret_cast<Vertex*>(g_verts);
+	{
+		stencil_table->UpdateValues(controlValues, &vertexBuffer[0]);             //Updates point values based on the control values
+	}
+
+	if (output_file.is_open())
+	{
+		Far::TopologyLevel const& last_refinement_level = refiner->GetLevel(refiner->GetMaxLevel());
+		int nfaces = last_refinement_level.GetNumFaces();
+
+		// print the vertex position
+		for (int i = 0; i < (int)vertexBuffer.size(); ++i)
+		{
+			float const* pos = vertexBuffer[i].GetPosition();
+
+			output_file << "v " << pos[0] << " " << pos[1] << " " << pos[2] << "\n";
+		}
+
+		// Print faces
+		for (int face = 0; face < nfaces; ++face)
+		{
+
+			Far::ConstIndexArray fverts = last_refinement_level.GetFaceVertices(face);
+			output_file << "f ";
+			for (int vert = 0; vert < fverts.size(); ++vert)
+			{
+				output_file << fverts[vert] + 1 << " "; // OBJ uses 1-based arrays...
+			}
+			output_file << "\n";
+		}
+		output_file.close();
+	}
+	else std::cout << "Unable to open file";
+}
+
+Far::TopologyRefiner * createTopologyRefiner(float *g_verts, const char* input_file)
 {
 	// Mesh creation
 	ifstream infile;
-	ofstream infile1;
 
 	//	Read the file
-	infile.open("C:\\Users\\charl\\Desktop\\bi-a_model.obj");// file containing numbers in 3 columns
-	infile1.open("C:\\Users\\charl\\Desktop\\verif.obj");// file containing numbers in 3 columns
+	infile.open(input_file);// file containing numbers in 3 columns
 
 	int pos = 0;
 	int pos1 = 0;
@@ -565,7 +469,6 @@ Far::TopologyRefiner * createTopologyRefiner(float *g_verts)
 					pos1++;
 					g_vertIndices[pos1] = num4 - 1;
 					pos1++;
-					infile1 << "f " << num1 << " " << num2 << " " << num3 << " " << num4 << endl;
 					g_nfaces++;
 				}
 			}
@@ -587,7 +490,6 @@ Far::TopologyRefiner * createTopologyRefiner(float *g_verts)
 						pos++;
 						g_verts[pos] = num3;
 						pos++;
-						infile1 << "v " << num1 << " " << num2 << " " << num3 << "" << endl;
 						g_nverts++;
 					}
 				}
@@ -603,7 +505,6 @@ Far::TopologyRefiner * createTopologyRefiner(float *g_verts)
 						pos1++;
 						g_vertIndices[pos1] = num3 - 1;
 						pos1++;
-						infile1 << "f " << num1 << " " << num2 << " " << num3 << endl;
 						g_nfaces++;
 					}
 				}

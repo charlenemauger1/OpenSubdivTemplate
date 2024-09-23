@@ -370,7 +370,7 @@ private:
     ConstIndexArray getPatchFVarValues(int patch, int channel) const;
 
 
-private:
+public:
 
     //
     // Topology
