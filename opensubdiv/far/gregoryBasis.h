@@ -161,14 +161,8 @@ public:
             ++(*size);
         }
 
-        Vtr::Index GetStencilIndex(int index) const {
-            return _stencils[index].index;
-        }
-        float GetStencilWeight(int index) const {
-            return _stencils[index].weight;
-        }
-
     private:
+
         int _size;
 
         struct Stencil {
@@ -225,28 +219,12 @@ public:
         Point P[4], Ep[4], Em[4], Fp[4], Fm[4];
 
         // for varying interpolation
-        Vtr::Index varyingIndex[4];
+        Point V[4];
     };
 
     typedef std::vector<GregoryBasis::Point> PointsVector;
 
-    // for basis point stencil
-    static void AppendToStencilTable(GregoryBasis::Point const &p,
-                                     StencilTable *table) {
-        int size = p.GetSize();
-        table->_sizes.push_back(size);
-        for (int i = 0; i < size; ++i) {
-            table->_indices.push_back(p.GetStencilIndex(i));
-            table->_weights.push_back(p.GetStencilWeight(i));
-        }
-    }
-
-    // for varying stencil (just copy)
-    static void AppendToStencilTable(int index, StencilTable *table) {
-        table->_sizes.push_back(1);
-        table->_indices.push_back(index);
-        table->_weights.push_back(1.f);
-    }
+    static StencilTable *CreateStencilTable(PointsVector const &stencils);
 
 private:
 

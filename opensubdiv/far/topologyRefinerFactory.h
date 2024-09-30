@@ -30,6 +30,14 @@
 #include "../far/error.h"
 
 #include <cassert>
+#include <cstdio>
+#include <cstring>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+
+using namespace std;
 
 namespace OpenSubdiv {
 namespace OPENSUBDIV_VERSION {
@@ -333,9 +341,8 @@ TopologyRefinerFactory<MESH>::Create(MESH const& mesh, Options options) {
 
 template <class MESH>
 bool
-TopologyRefinerFactory<MESH>::populateBaseLevel(TopologyRefiner& refiner, MESH const& mesh, Options options) {
-
-    //
+TopologyRefinerFactory<MESH>::populateBaseLevel(TopologyRefiner& refiner, MESH const& mesh, Options options) {	
+    
     //  Construction of a specialized topology refiner involves four steps, each of which
     //  involves a method specialized for MESH followed by one that takes an action in
     //  response to it or in preparation for the next step.
@@ -349,33 +356,61 @@ TopologyRefinerFactory<MESH>::populateBaseLevel(TopologyRefiner& refiner, MESH c
     //  an inventory of all components and their relations that is used to allocate buffers
     //  to be efficiently populated in the subsequent topology assignment step.
     //
-    if (not resizeComponentTopology(refiner, mesh)) return false;
-    if (not prepareComponentTopologySizing(refiner)) return false;
-
+	if (not resizeComponentTopology(refiner, mesh))
+	{
+		std::cout << "not resizeComponentTopology line 361" << endl;
+		return false;
+	}
+	if (not prepareComponentTopologySizing(refiner))
+	{
+		std::cout << "not prepareComponentTopologySizing(refiner) line 366" << endl;
+		return false;
+	}
     //
     //  Assignment of the topology -- this is a required specialization for MESH.  If edges
     //  are specified, all other topological relations are expected to be defined for them.
     //  Otherwise edges and remaining topology will be completed from the face-vertices:
     //
-    bool             validate = options.validateFullTopology;
+	bool             validate = options.validateFullTopology;
     TopologyCallback callback = reinterpret_cast<TopologyCallback>(reportInvalidTopology);
     void const *     userData = &mesh;
         
-    if (not assignComponentTopology(refiner, mesh)) return false;
-    if (not prepareComponentTopologyAssignment(refiner, validate, callback, userData)) return false;
+	if (not assignComponentTopology(refiner, mesh))
+	{
+		return false;
+	}
+
+	if (not prepareComponentTopologyAssignment(refiner, validate, callback, userData))
+	{
+		return false;
+	}
 
     //
     //  User assigned and internal tagging of components -- an optional specialization for
     //  MESH.  Allows the specification of sharpness values, holes, etc.
     //
-    if (not assignComponentTags(refiner, mesh)) return false;
-    if (not prepareComponentTagsAndSharpness(refiner)) return false;
+	if (not assignComponentTags(refiner, mesh))
+	{
+		return false;
+	}
 
+	if (not prepareComponentTagsAndSharpness(refiner))
+	{
+		return false;
+	}
     //
     //  Defining channels of face-varying primvar data -- an optional specialization for MESH.
     //
-    if (not assignFaceVaryingTopology(refiner, mesh)) return false;
-    if (not prepareFaceVaryingChannels(refiner)) return false;
+
+	if (not assignFaceVaryingTopology(refiner, mesh))
+	{
+		return false;
+	}
+
+	if (not prepareFaceVaryingChannels(refiner))
+	{
+		return false;
+	}
 
     return true;
 }

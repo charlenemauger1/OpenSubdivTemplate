@@ -32,6 +32,7 @@
 #include "../far/endCapGregoryBasisPatchFactory.h"
 #include "../far/endCapLegacyGregoryPatchFactory.h"
 
+#include <malloc.h>
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -447,7 +448,7 @@ PatchTableFactory::gatherFVarData(AdaptiveContext & context, int level,
 PatchParam *
 PatchTableFactory::computePatchParam(
     TopologyRefiner const & refiner, PtexIndices const &ptexIndices,
-    int depth, Vtr::Index faceIndex, int boundaryMask, 
+    int depth, Vtr::Index faceIndex, int boundaryMask,
     int transitionMask, PatchParam *param) {
 
     if (param == NULL) return NULL;
@@ -1122,26 +1123,14 @@ PatchTableFactory::populateAdaptivePatches(
     EndCapBSplineBasisPatchFactory *endCapBSpline = NULL;
     EndCapGregoryBasisPatchFactory *endCapGregoryBasis = NULL;
     EndCapLegacyGregoryPatchFactory *endCapLegacyGregory = NULL;
-    StencilTable *localPointStencils = NULL;
-    StencilTable *localPointVaryingStencils = NULL;
 
     switch(context.options.GetEndCapType()) {
     case Options::ENDCAP_GREGORY_BASIS:
-        localPointStencils = new StencilTable(0);
-        localPointVaryingStencils = new StencilTable(0);
         endCapGregoryBasis = new EndCapGregoryBasisPatchFactory(
-            refiner,
-            localPointStencils,
-            localPointVaryingStencils,
-            context.options.shareEndCapPatchPoints);
+            refiner, context.options.shareEndCapPatchPoints);
         break;
     case Options::ENDCAP_BSPLINE_BASIS:
-        localPointStencils = new StencilTable(0);
-        localPointVaryingStencils = new StencilTable(0);
-        endCapBSpline = new EndCapBSplineBasisPatchFactory(
-            refiner,
-            localPointStencils,
-            localPointVaryingStencils);
+        endCapBSpline = new EndCapBSplineBasisPatchFactory(refiner);
         break;
     case Options::ENDCAP_LEGACY_GREGORY:
         endCapLegacyGregory = new EndCapLegacyGregoryPatchFactory(refiner);
@@ -1303,29 +1292,19 @@ PatchTableFactory::populateAdaptivePatches(
     }
 
     // finalize end patches
-    if (localPointStencils and localPointStencils->GetNumStencils() > 0) {
-        localPointStencils->finalize();
-    } else {
-        delete localPointStencils;
-        localPointStencils = NULL;
-    }
-
-    if (localPointVaryingStencils and localPointVaryingStencils->GetNumStencils() > 0) {
-        localPointVaryingStencils->finalize();
-    } else {
-        delete localPointVaryingStencils;
-        localPointVaryingStencils = NULL;
-    }
-
     switch(context.options.GetEndCapType()) {
     case Options::ENDCAP_GREGORY_BASIS:
-        table->_localPointStencils = localPointStencils;
-        table->_localPointVaryingStencils = localPointVaryingStencils;
+        table->_localPointStencils =
+            endCapGregoryBasis->CreateVertexStencilTable();
+        table->_localPointVaryingStencils =
+            endCapGregoryBasis->CreateVaryingStencilTable();
         delete endCapGregoryBasis;
         break;
     case Options::ENDCAP_BSPLINE_BASIS:
-        table->_localPointStencils = localPointStencils;
-        table->_localPointVaryingStencils = localPointVaryingStencils;
+        table->_localPointStencils =
+            endCapBSpline->CreateVertexStencilTable();
+        table->_localPointVaryingStencils =
+            endCapBSpline->CreateVaryingStencilTable();
         delete endCapBSpline;
         break;
     case Options::ENDCAP_LEGACY_GREGORY:

@@ -233,6 +233,8 @@ TopologyRefiner::RefineUniform(UniformOptions options) {
         }
         refinement->refine(refineOptions);
 
+
+
         appendLevel(childLevel);
         appendRefinement(*refinement);
     }

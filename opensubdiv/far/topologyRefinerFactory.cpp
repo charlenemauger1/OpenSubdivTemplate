@@ -120,12 +120,13 @@ TopologyRefinerFactoryBase::prepareComponentTopologySizing(TopologyRefiner& refi
 bool
 TopologyRefinerFactoryBase::prepareComponentTopologyAssignment(TopologyRefiner& refiner, bool fullValidation,
                                                                TopologyCallback callback, void const * callbackData) {
-
     Vtr::internal::Level& baseLevel = refiner.getLevel(0);
-
     bool completeMissingTopology = (baseLevel.getNumEdges() == 0);
-    if (completeMissingTopology) {
-        if (not baseLevel.completeTopologyFromFaceVertices()) {
+
+    if (completeMissingTopology) 
+	{
+        if (not baseLevel.completeTopologyFromFaceVertices()) 
+		{
             char msg[1024];
             snprintf(msg, 1024, "Failure in TopologyRefinerFactory<>::Create() -- "
                     "vertex with valence %d > %d max.",
@@ -133,14 +134,18 @@ TopologyRefinerFactoryBase::prepareComponentTopologyAssignment(TopologyRefiner& 
             Error(FAR_RUNTIME_ERROR, msg);
             return false;
         }
-    } else {
-        if (baseLevel.getMaxValence() == 0) {
+    } 
+	else 
+	{
+        if (baseLevel.getMaxValence() == 0) 
+		{
             Error(FAR_RUNTIME_ERROR, "Failure in TopologyRefinerFactory<>::Create() -- "
                 "maximum valence not assigned.");
             return false;
         }
     }
 
+	
     if (fullValidation) {
         if (not baseLevel.validateTopology(callback, callbackData)) {
             if (completeMissingTopology) {

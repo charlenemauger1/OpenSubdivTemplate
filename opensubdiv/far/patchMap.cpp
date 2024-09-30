@@ -105,6 +105,7 @@ PatchMap::initialize( PatchTable const & patchTable ) {
 
     // each coarse face has a root node associated to it that we need to initialize
     quadtree.resize(nfaces);
+	
 
     // populate the quadtree from the FarPatchArrays sub-patches
     for (Index parray=0, handleIndex=0; parray<narrays; ++parray) {
@@ -113,21 +114,23 @@ PatchMap::initialize( PatchTable const & patchTable ) {
 
         for (int i=0; i < patchTable.GetNumPatches(parray); ++i, ++handleIndex) {
 
-            PatchParam const & param = params[i];
 
-            unsigned short depth = param.GetDepth();
+            PatchParam const & param = params[i];                               // gets the parameters of the patch
 
-            QuadNode * node = &quadtree[ params[i].GetFaceId() ];
+            unsigned short depth = param.GetDepth();                            // gets the depth of the patch
 
-            if (depth==(param.NonQuadRoot() ? 1 : 0)) {
+            QuadNode * node = &quadtree[ params[i].GetFaceId() ];               // params[i].GetFaceId()   gets the face from the control mesh corresponding to the patch                     
+
+            if (depth==(param.NonQuadRoot() ? 1 : 0)) {                        // si la depth vaut 1, alors = 0;
+				
                 // special case : regular BSpline face w/ no sub-patches
-                node->SetChild( handleIndex );
+                node->SetChild( handleIndex);                                  // si la profondeur vaut 1, il n y a pas de sub patch donc la valeur de l enfant est egale a l index du patch
                 continue;
             }
 
-            int u = param.GetU(),
-                v = param.GetV(),
-                pdepth = param.NonQuadRoot() ? depth-2 : depth-1,
+			int u = param.GetU(),
+				v = param.GetV(),
+				pdepth = param.NonQuadRoot() ? depth - 2 : depth - 1,
                 half = 1 << pdepth;
 
             for (unsigned char j=0; j<depth; ++j) {
@@ -142,6 +145,7 @@ PatchMap::initialize( PatchTable const & patchTable ) {
                 if (j==pdepth) {
                    // we have reached the depth of the sub-patch : add a leaf
                    assert( not node->children[quadrant].isSet );
+
                    node->SetChild(quadrant, handleIndex, true);
                    break;
                 } else {
@@ -149,9 +153,11 @@ PatchMap::initialize( PatchTable const & patchTable ) {
                     if (not node->children[quadrant].isSet) {
                         // create a new branch in the quadrant
                         node = addChild(quadtree, node, quadrant);
+
                     } else {
                         // travel down an existing branch
                         node = &(quadtree[ node->children[quadrant].idx ]);
+						//std::cout << i << " " << node << std::endl;
                     }
                 }
             }
@@ -160,6 +166,11 @@ PatchMap::initialize( PatchTable const & patchTable ) {
 
     // copy the resulting quadtree to eliminate un-unused vector capacity
     _quadtree = quadtree;
+
+
+
+
+
 }
 
 

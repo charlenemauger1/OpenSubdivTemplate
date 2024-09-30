@@ -66,7 +66,7 @@ public:
     bool IsUniform() const   { return _isUniform; }
 
     /// \brief Returns the number of refinement levels
-    int  GetNumLevels() const { return (int)_farLevels.size(); }
+    int  GetNumLevels() const { return (int)_levels.size(); }
 
     /// \brief Returns the highest level of refinement
     int  GetMaxLevel() const { return _maxLevel; }
@@ -208,7 +208,7 @@ private:
     void appendRefinement(Vtr::internal::Refinement & newRefinement);
     void assembleFarLevels();
 
-private:
+public:
 
     Sdc::SchemeType _subdivType;
     Sdc::Options    _subdivOptions;

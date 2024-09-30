@@ -72,7 +72,7 @@ public:
     ///
     Handle const * FindPatch( int faceid, float u, float v ) const;
 
-private:
+public:
 
     inline void initialize( PatchTable const & patchTable );
 
@@ -155,14 +155,28 @@ PatchMap::FindPatch( int faceid, float u, float v ) const {
 
     QuadNode const * node = &_quadtree[faceid];
 
+
+
     float half = 0.5f;
 
     // 0xFF : we should never have depths greater than k_InfinitelySharp
+
+	
     for (int depth=0; depth<0xFF; ++depth) {
 
         float delta = half * 0.5f;
 
-        int quadrant = resolveQuadrant( half, u, v );
+        int quadrant = resolveQuadrant(half, u, v );    // gives 0,1,2,3 according to the position of (u,v) on the face 
+		// (0, 0) o---- - o---- - o
+		//	      |       |       |
+		//	      |   0   |   3   |
+		//	      |       |       |
+		//	      o---- - o---- - o
+		//	      |       |       |
+		//	      |   1   |   2   |
+		//	      |       |       |
+		//	      o---- - o---- - o (1, 1)
+
         assert(quadrant>=0);
 
         // is the quadrant a hole ?
@@ -177,6 +191,7 @@ PatchMap::FindPatch( int faceid, float u, float v ) const {
 
         half = delta;
     }
+
 
     assert(0);
     return 0;

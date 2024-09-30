@@ -212,8 +212,7 @@ StencilTableFactory::AppendLocalPointStencilTable(
 
     // factorize and append.
     if (baseStencilTable == NULL or
-        localPointStencilTable == NULL or
-        localPointStencilTable->GetNumStencils() == 0) return NULL;
+        localPointStencilTable == NULL) return NULL;
 
     // baseStencilTable can be built with or without singular stencils
     // (single weight of 1.0f) as place-holders for coarse mesh vertices.

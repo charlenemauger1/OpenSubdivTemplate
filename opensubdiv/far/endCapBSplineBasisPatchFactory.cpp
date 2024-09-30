@@ -49,10 +49,7 @@ namespace {
 }
 
 EndCapBSplineBasisPatchFactory::EndCapBSplineBasisPatchFactory(
-    TopologyRefiner const & refiner,
-    StencilTable * vertexStencils,
-    StencilTable * varyingStencils) :
-    _vertexStencils(vertexStencils), _varyingStencils(varyingStencils),
+    TopologyRefiner const & refiner) :
     _refiner(&refiner), _numVertices(0), _numPatches(0) {
 
     // Sanity check: the mesh must be adaptively refined
@@ -64,14 +61,8 @@ EndCapBSplineBasisPatchFactory::EndCapBSplineBasisPatchFactory(
     // finest level.
     int numMaxLevelFaces = refiner.GetLevel(refiner.GetMaxLevel()).GetNumFaces();
 
-    // we typically use 7 patch points for each bspline endcap.
-    int numPatchPointsExpected = numMaxLevelFaces * 7;
-    // limits to 100M (=800M bytes) entries for the reserved size.
-    int numStencilsExpected = std::min(numPatchPointsExpected * 16,
-                                       100*1024*1024);
-    _vertexStencils->reserve(numPatchPointsExpected, numStencilsExpected);
-    // varying stencils use only 1 index with weight=1.0
-    _varyingStencils->reserve(numPatchPointsExpected, numPatchPointsExpected);
+    _vertexStencils.reserve(numMaxLevelFaces*16);
+    _varyingStencils.reserve(numMaxLevelFaces*16);
 }
 
 ConstIndexArray
@@ -178,7 +169,7 @@ EndCapBSplineBasisPatchFactory::getPatchPointsFromGregoryBasis(
                     p.AddWithWeight(H[i*4+k], Q[j][k]);
                 }
             }
-            GregoryBasis::AppendToStencilTable(p, _vertexStencils);
+            _vertexStencils.push_back(p);
         }
     }
     int varyingIndices[] = { 0, 0, 1, 1,
@@ -186,11 +177,11 @@ EndCapBSplineBasisPatchFactory::getPatchPointsFromGregoryBasis(
                              3, 3, 2, 2,
                              3, 3, 2, 2,};
     for (int i = 0; i < 16; ++i) {
-        int varyingIndex = facePoints[varyingIndices[i]] + levelVertOffset;
-        _varyingStencils->_sizes.push_back(1);
-        _varyingStencils->_indices.push_back(varyingIndex);
-        _varyingStencils->_weights.push_back(1.0f);
+        GregoryBasis::Point p(1);
+        p.AddWithWeight(facePoints[varyingIndices[i]] + levelVertOffset, 1.0f);
+        _varyingStencils.push_back(p);
     }
+
 
     ++_numPatches;
     return ConstIndexArray(&_patchPoints[(_numPatches-1)*16], 16);
@@ -225,6 +216,8 @@ EndCapBSplineBasisPatchFactory::computeLimitStencils(
             if (manifoldRing[i*2] == facePoints[im])
                 prev = i;
         }
+        /*printf("cout start %d\n",int(start));
+        printf("cout prev %d\n",int(prev));*/
     }
     assert(start > -1 && prev > -1);
 
@@ -464,38 +457,39 @@ EndCapBSplineBasisPatchFactory::getPatchPoints(
 
     int offset = _refiner->GetNumVerticesTotal();
 
-    int varyingIndex0 = facePoints[vid] + levelVertOffset;
-    int varyingIndex1 = facePoints[(vid+1)&3] + levelVertOffset;
-    int varyingIndex3 = facePoints[(vid+3)&3] + levelVertOffset;
+    GregoryBasis::Point V0, V1, V3;
+    V0.AddWithWeight(facePoints[vid] + levelVertOffset, 1.0f);
+    V1.AddWithWeight(facePoints[(vid+1)&3] + levelVertOffset, 1.0f);
+    V3.AddWithWeight(facePoints[(vid+3)&3] + levelVertOffset, 1.0f);
 
     // push back to stencils;
     patchPoints[3* vid + 6]        = (_numVertices++) + offset;
-    GregoryBasis::AppendToStencilTable(X6, _vertexStencils);
-    GregoryBasis::AppendToStencilTable(varyingIndex0, _varyingStencils);
+    _vertexStencils.push_back(X6);
+    _varyingStencils.push_back(V0);
 
     patchPoints[3*((vid+1)%4) + 4] = (_numVertices++) + offset;
-    GregoryBasis::AppendToStencilTable(X7, _vertexStencils);
-    GregoryBasis::AppendToStencilTable(varyingIndex1, _varyingStencils);
+    _vertexStencils.push_back(X7);
+    _varyingStencils.push_back(V1);
 
     patchPoints[3*((vid+1)%4) + 5] = (_numVertices++) + offset;
-    GregoryBasis::AppendToStencilTable(X8, _vertexStencils);
-    GregoryBasis::AppendToStencilTable(varyingIndex1, _varyingStencils);
+    _vertexStencils.push_back(X8);
+    _varyingStencils.push_back(V1);
 
     patchPoints[3* vid + 4]        = (_numVertices++) + offset;
-    GregoryBasis::AppendToStencilTable(X4, _vertexStencils);
-    GregoryBasis::AppendToStencilTable(varyingIndex0, _varyingStencils);
+    _vertexStencils.push_back(X4);
+    _varyingStencils.push_back(V0);
 
     patchPoints[3*((vid+3)%4) + 6] = (_numVertices++) + offset;
-    GregoryBasis::AppendToStencilTable(X15, _vertexStencils);
-    GregoryBasis::AppendToStencilTable(varyingIndex3, _varyingStencils);
+    _vertexStencils.push_back(X15);
+    _varyingStencils.push_back(V3);
 
     patchPoints[3*((vid+3)%4) + 5] = (_numVertices++) + offset;
-    GregoryBasis::AppendToStencilTable(X14, _vertexStencils);
-    GregoryBasis::AppendToStencilTable(varyingIndex3, _varyingStencils);
+    _vertexStencils.push_back(X14);
+    _varyingStencils.push_back(V3);
 
     patchPoints[3*vid + 5]         = (_numVertices++) + offset;
-    GregoryBasis::AppendToStencilTable(X5, _vertexStencils);
-    GregoryBasis::AppendToStencilTable(varyingIndex0, _varyingStencils);
+    _vertexStencils.push_back(X5);
+    _varyingStencils.push_back(V0);
 
     // reorder into UV row-column
     static int const permuteRegular[16] =

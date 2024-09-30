@@ -246,21 +246,23 @@ void Spline<BASIS>::GetPatchWeights(PatchParam const & param,
         }
     }
 
-    if (derivS and derivT) {
+    if (derivS and derivT) 
+	{
         // Compute the tensor product weight of the differentiated (s,t) basis
         // function corresponding to each control vertex (scaled accordingly):
 
         float dScale = (float)(1 << param.GetDepth());
-
         AdjustBoundaryWeights(param, dsWeights, dtWeights);
-
-        for (int i = 0; i < 4; ++i) {
-            for (int j = 0; j < 4; ++j) {
+        for (int i = 0; i < 4; ++i) 
+		{
+            for (int j = 0; j < 4; ++j)
+			{
                 derivS[4*i+j] = dsWeights[j] * tWeights[i] * dScale;
                 derivT[4*i+j] = sWeights[j] * dtWeights[i] * dScale;
             }
         }
     }
+
 }
 
 void GetBilinearWeights(PatchParam const & param,

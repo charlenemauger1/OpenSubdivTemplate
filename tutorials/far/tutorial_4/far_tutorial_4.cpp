@@ -93,7 +93,8 @@ using namespace OpenSubdiv;
 
 Far::TopologyRefiner* createTopologyRefiner(float* g_verts, const char* input_file);
 
-void export_subdivived_mesh_and_matrix(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts, const char* output_sub_matrix);
+void export_subdivived_mesh(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts);
+void export_subdivived_matrices(Far::TopologyRefiner* refiner, float* g_verts, const char* output_sub_matrix, bool generate_intermediate_levels);
 
 //------------------------------------------------------------------------------
 int main(int, char**) {
@@ -107,13 +108,16 @@ int main(int, char**) {
 	const char* input_file = "C:\\Users\\charl\\Desktop\\bi-a_model.obj";
 	const char* output_mesh = "C:\\Users\\charl\\Desktop\\bi-a_model-sub-2.obj";
 	const char* subdivision_matrix = "C:\\Users\\charl\\Desktop\\subdiv_matrix.txt";
+	const char* subdivision_matrix_local_points = "C:\\Users\\charl\\Desktop\\subdiv_matrix_local_points.txt";
 
 	Far::TopologyRefiner* refiner = createTopologyRefiner(g_verts, input_file);
 
 	refiner->RefineUniform(Far::TopologyRefiner::UniformOptions(maxlevel));   // Refine the topology RefineUniform
-	cout << "refinement " << endl;
 
-	export_subdivived_mesh_and_matrix(refiner, output_mesh, g_verts, subdivision_matrix);
+	export_subdivived_mesh(refiner, output_mesh, g_verts);
+	export_subdivived_matrices(refiner, g_verts, subdivision_matrix, false);
+	export_subdivived_matrices(refiner, g_verts, subdivision_matrix_local_points, true); // generate intermediate_points
+	
 
 	// PatchTable
 	// ---------------------
@@ -125,7 +129,6 @@ int main(int, char**) {
 	cout << "fin de la patchTable factory " << endl;
 
 	Far::PatchTable::PatchVertsTable const& table = patchTable->GetPatchControlVerticesTable();            // Indices of the control vertices of the patches
-
 																										   // Compute the total number of points we need to evaluate patchtable. We use local points around extraordinary features.
 	int nRefinerVertices = refiner->GetNumVerticesTotal();  // gives the total number of vertices in all levels
 
@@ -134,18 +137,14 @@ int main(int, char**) {
 															// Create a buffer to hold the position of the refined verts and local points, then copy the coarse positions at the beginning.
 	std::vector<Vertex> verts(nRefinerVertices + nLocalPoints);
 
-	cout << "nRefinerVertices = " << nRefinerVertices << endl;
-	cout << "nLocalPoint = " << nLocalPoints << endl;
+	cout << "nRefinerVertices = " << nRefinerVertices << endl;	cout << "nLocalPoint = " << nLocalPoints << endl;
 
-	//	static int const g_nverts = 338;
-	//static int const g_nverts = 40;
-	static int const g_nverts = 1152;// 210; // control points
+	static int const g_nverts = refiner->GetLevel(0).GetNumVertices();// 210; // control points
 
 	memcpy(&verts[0], g_verts, g_nverts * 3 * sizeof(float));
 
 	// Adaptive refinement may result in fewer levels than maxIsolation.
 	int nRefinedLevels = refiner->GetNumLevels();      // returns the number of refinement levels
-
 
 													   // Interpolate vertex primvar data : they are the control vertices of the limit patches
 	Vertex* src = &verts[0];    // verts includes the refined vertices and the local points
@@ -158,61 +157,60 @@ int main(int, char**) {
 	}
 
 
+
+
+	// NEED THIS BIT< BUT BUG AT THE MOMENT
 	// Evaluate local points from interpolated vertex primvars.
 	cout << "evaluate local point... " << endl;
 	//patchTable->ComputeLocalPointValues(&verts[0], &verts[nRefinerVertices]);    // updates local point values based on the refined values src=&vert[0] --> Buffer with primvar data for the control vertices and refined vertices. dst=&verts[nRefinerVertices] --> Destination buffer for the computed local points
 
-	Far::StencilTable const* stenciltab = patchTable->GetLocalPointStencilTable();   // Returns the stencil table to get change of basis patch points
+	//Far::StencilTable const* stenciltab = patchTable->GetLocalPointStencilTable();   // Returns the stencil table to get change of basis patch points
 																			 // Creation of a Far::PatchMap to help locating patches in the table
 
-	ofstream mytable1;
-
-	mytable1.open("C:\\Users\\charl\\Desktop\\stencil.obj");
-
-	// Stencil Table without Patches
-
-	//cout << stenciltab->GetNumControlVertices() <<  endl;
-	//cout << stenciltab->GetNumStencils() << endl;
-
-	// get local point stencil table
-	// -----------------------------------
-
-
-	const int num_vertices1 = stenciltab->GetNumControlVertices();
-	const int num_stencil1 = stenciltab->GetNumStencils();
-	cout << " stenciltab->GetNumStencils() = " << stenciltab->GetNumStencils() << endl;
-	const float* weights1;
-	Far::Stencil Stencil1;
-	const Far::Index* indices1;
-	std::cout << "stencil table" << endl;
-	float** array1 = new float*[num_stencil1];
-	for (int i = 0; i < num_stencil1; ++i)
-	array1[i] = new float[num_vertices1];
-
-
-	// initialization
-	for (int i = 0; i < num_stencil1; ++i)
-	for (int j = 0; j < num_vertices1; ++j)
-	array1[i][j] = 0.0;
-
-
-	// calcul uniquement des poids et des indices	cout << "creation of the table" << endl;
-	for (int i = 0; i < stenciltab->GetNumStencils(); i++)
-	{
-	Stencil1 = stenciltab->GetStencil((Far::Index)(i));
-	int size1 = Stencil1.GetSize();
-	indices1 = Stencil1.GetVertexIndices();
-	weights1 = Stencil1.GetWeights();
-
-
-	for (int j = 0; j < size1; j++)
-	mytable1 << weights1[j] << ' ';
-
-	mytable1 << ' ';
-	for (int k = 0; k < size1; k++)
-	mytable1 << indices1[k] << ' ';
-	mytable1 << endl;
-	}
+	//ofstream mytable1;
+	//
+	//mytable1.open("C:\\Users\\charl\\Desktop\\stencil.obj");
+	//
+	////cout << stenciltab->GetNumControlVertices() <<  endl;
+	////cout << stenciltab->GetNumStencils() << endl;
+	//
+	//// get local point stencil table
+	//// -----------------------------------
+	//const int num_vertices1 = stenciltab->GetNumControlVertices();
+	//const int num_stencil1 = stenciltab->GetNumStencils();
+	//cout << " stenciltab->GetNumStencils() = " << stenciltab->GetNumStencils() << endl;
+	//const float* weights1;
+	//Far::Stencil Stencil1;
+	//const Far::Index* indices1;
+	//std::cout << "stencil table" << endl;
+	//float** array1 = new float*[num_stencil1];
+	//for (int i = 0; i < num_stencil1; ++i)
+	//array1[i] = new float[num_vertices1];
+	//
+	//
+	//// initialization
+	//for (int i = 0; i < num_stencil1; ++i)
+	//for (int j = 0; j < num_vertices1; ++j)
+	//array1[i][j] = 0.0;
+	//
+	//
+	//// calcul uniquement des poids et des indices	cout << "creation of the table" << endl;
+	//for (int i = 0; i < stenciltab->GetNumStencils(); i++)
+	//{
+	//Stencil1 = stenciltab->GetStencil((Far::Index)(i));
+	//int size1 = Stencil1.GetSize();
+	//indices1 = Stencil1.GetVertexIndices();
+	//weights1 = Stencil1.GetWeights();
+	//
+	//
+	//for (int j = 0; j < size1; j++)
+	//mytable1 << weights1[j] << ' ';
+	//
+	//mytable1 << ' ';
+	//for (int k = 0; k < size1; k++)
+	//mytable1 << indices1[k] << ' ';
+	//mytable1 << endl;
+	//}
 
 
 	// The PatchMap provides a quad-tree based lookup structure that, given a singular parametric location, can efficiently return a handle to the sub - patch that contains this location. 
@@ -237,9 +235,9 @@ int main(int, char**) {
 	// patch parameters
 
 	ofstream file;
-	file.open("C:\\Users\\charl\\Desktop\\testMatlab.obj");
+	file.open("C:\\Users\\charl\\Desktop\\testMatlab.txt");
 	ofstream patch;
-	patch.open("C:\\Users\\charl\\Desktop\\patch_param.obj");
+	patch.open("C:\\Users\\charl\\Desktop\\patch_param.txt");
 
 	int u;
 	cout << "evaluation... " << endl;
@@ -304,11 +302,11 @@ int main(int, char**) {
 	// __________________________
 
 
-	cout << "Stencil Table" << endl;
-	Far::StencilTableFactory::Options options;
-	options.generateIntermediateLevels = false;// false;
-	options.generateOffsets = true;
-	Far::StencilTable const* stencilTable = Far::StencilTableFactory::Create(*refiner, options);
+	//cout << "Stencil Table" << endl;
+	//Far::StencilTableFactory::Options options;
+	//options.generateIntermediateLevels = false;// false;
+	//options.generateOffsets = true;
+	//Far::StencilTable const* stencilTable = Far::StencilTableFactory::Create(*refiner, options);
 
 
 	// Stencil Table without Patches
@@ -353,79 +351,82 @@ int main(int, char**) {
 		}
 
 		mytable << endl;
-
 	}
 	mytable.close();*/
 
-
 	delete refiner;
-	delete stencilTable;
+	//delete stencilTable;
 
 }
 
 //------------------------------------------------------------------------------
 
-void export_subdivived_mesh_and_matrix(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts, const char* output_sub_matrix)
-{	
-	ofstream output_file;
-	output_file.open(output_obj);
-
-
+void export_subdivived_matrices(Far::TopologyRefiner* refiner, float* g_verts, const char* output_sub_matrix, bool generate_intermediate_levels)
+{
 	ofstream matrix_file;
 	matrix_file.open(output_sub_matrix);
 
+	Far::StencilTableFactory::Options options;
+	options.generateIntermediateLevels = generate_intermediate_levels;
+	options.generateOffsets = true;
+	Far::StencilTable const* stencil_table = Far::StencilTableFactory::Create(*refiner, options);
+
+	if (matrix_file.is_open())
+	{
+		// export matrix
+		const int num_vertices = stencil_table->GetNumControlVertices();
+		const int num_stencil = stencil_table->GetNumStencils();
+		const float* weights;
+		Far::Stencil stencil;
+		const Far::Index* indices;
+		std::cout << "Export subdivision matrix" << endl;
+		float** array = new float*[num_stencil];
+		for (int i = 0; i < num_stencil; ++i)
+			array[i] = new float[num_vertices];
+
+		// initialization
+		for (int i = 0; i < num_stencil; ++i)
+			for (int j = 0; j < num_vertices; ++j)
+				array[i][j] = 0.0;
+
+		for (int i = 0; i < stencil_table->GetNumStencils(); i++)
+		{
+			stencil = stencil_table->GetStencil((Far::Index)(i));
+			int size = stencil.GetSize();
+			indices = stencil.GetVertexIndices();
+			weights = stencil.GetWeights();
+
+			for (int j = 0; j < size; j++)
+			{
+				int m = (int)(indices[j]);
+				array[i][m] = weights[j];
+			}
+		}
+
+		for (int i = 0; i < stencil_table->GetNumStencils(); i++)
+		{
+			for (int j = 0; j < num_vertices; j++)
+			{
+				matrix_file << array[i][j] << ' ';
+			}
+
+			matrix_file << endl;
+
+		}
+		matrix_file.close();
+	}
+	else std::cout << "Unable to open file";
+}
+
+void export_subdivived_mesh(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts)
+{	
+	ofstream output_file;
+	output_file.open(output_obj);
 
 	Far::StencilTableFactory::Options options;
 	options.generateIntermediateLevels = false;
 	options.generateOffsets = true;
 	Far::StencilTable const* stencil_table = Far::StencilTableFactory::Create(*refiner, options);
-
-
-	// export matrix
-	const int num_vertices = stencil_table->GetNumControlVertices();
-	const int num_stencil = stencil_table->GetNumStencils();
-	const float* weights;
-	Far::Stencil stencil;
-	const Far::Index* indices;
-	std::cout << "Export subdivision matrix" << endl;
-	float** array = new float*[num_stencil];
-	for (int i = 0; i < num_stencil; ++i)
-		array[i] = new float[num_vertices];
-
-
-	// initialization
-	for (int i = 0; i < num_stencil; ++i)
-		for (int j = 0; j < num_vertices; ++j)
-			array[i][j] = 0.0;
-
-
-	for (int i = 0; i < stencil_table->GetNumStencils(); i++)
-	{
-		stencil = stencil_table->GetStencil((Far::Index)(i));
-		int size = stencil.GetSize();
-		indices = stencil.GetVertexIndices();
-		weights = stencil.GetWeights();
-
-		for (int j = 0; j < size; j++)
-		{
-			int m = (int)(indices[j]);
-			array[i][m] = weights[j];
-		}
-
-	}
-
-	for (int i = 0; i < stencil_table->GetNumStencils(); i++)
-	{
-		for (int j = 0; j < num_vertices; j++)
-		{
-			matrix_file << array[i][j] << ' ';
-		}
-
-		matrix_file << endl;
-
-	}
-	matrix_file.close();
-
 
 	// export mesh
 	// Allocate vertex primvar buffer (1 stencil for each vertex)
