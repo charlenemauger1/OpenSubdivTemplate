@@ -33,7 +33,7 @@
 using namespace OpenSubdiv;
 
 // Creates a Far::TopologyRefiner from the pyramid shape above
-static Far::TopologyRefiner * createTopologyRefiner();
+//static Far::TopologyRefiner * createTopologyRefiner();
 
 //------------------------------------------------------------------------------
 // Vertex container implementation.
@@ -100,42 +100,64 @@ struct LimitFrame {
 		deriv2[3];
 };
 
-void export_subdivived_mesh(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts);
-
-Far::TopologyRefiner* createTopologyRefiner(float* g_verts, const char* input_file);
-void export_stencil_matrices(Far::TopologyRefiner* refiner, const char* output_sub_matrix, bool generate_intermediate_levels, bool export_control_mesh_stencil);
+void export_subdivived_mesh(Far::TopologyRefiner* refiner, string output_obj, float* g_verts);
+Far::TopologyRefiner* createTopologyRefiner(float* g_verts, const string input_file);
+void export_stencil_matrices(Far::TopologyRefiner* refiner, string output_sub_matrix, bool generate_intermediate_levels, bool export_control_mesh_stencil);
 
 //------------------------------------------------------------------------------
-int main(int, char **) {
+//int main(int, char **) {
+int main(int argc, char* argv[]) {
 
-	// Generate a FarTopologyRefiner (see far_tutorial_0 for details).
-	char* output_folder = "C:\\Users\\charl\\Desktop\\bi-a-template\\";
+	std::cout << "output_path " << argv[1] << endl;
+	std::cout << "input mesh " << argv[2] << endl;
+	std::cout << "number_of_subdivision_level " << argv[3] << endl;
+	ofstream file, patch, boundary, bspline, etvertexelemnum, etvertexXi, fraction, patch_coordinates, patch_index, local_points_file, debug_file;
 
-	const char* input_file = "C:\\Users\\charl\\Desktop\\BiA.obj";
-	const char* output_mesh = "C:\\Users\\charl\\Desktop\\BiA-sub.obj";
-	const char* subdivision_matrix = "C:\\Users\\charl\\Desktop\\bi-a-template\\subdivision_matrix.txt";
-	const char* refiner_points_matrix = "C:\\Users\\charl\\Desktop\\bi-a-template\\refiner_matrix.txt";
+	string output_path = argv[1];
+	int number_of_subdivision_level = atoi(argv[3]);
+	const string input_file = argv[2];
+	string output_mesh(output_path + "BiA-sub.obj");
+	string subdivision_matrix(output_path + "subdivision_matrix.txt");
+	string refiner_points_matrix(output_path + "refiner_matrix.txt");
 
-	int number_of_subdivision_level = 2;
-	int number_of_endo_element = 304;
+	debug_file.open(output_path + "debug_evaluated_points.obj");
+	file.open(output_path + "testMatlab.txt");
+	patch.open(output_path + "patch_param.txt");
+	boundary.open(output_path + "boundary.txt");
+	bspline.open(output_path + "control_points_patches.txt");
+	etvertexelemnum.open(output_path + "etVertexElementNum.txt");
+	etvertexXi.open(output_path + "etVertexXi.txt");
+	fraction.open(output_path + "fraction.txt");
+	patch_coordinates.open(output_path + "patch_coordinates.txt");
+	patch_index.open(output_path + "patch_index.txt");
+	local_points_file.open(output_path + "local_points_sparse_matrix.txt");
+
 	float g_verts[100000];
+	// Generate a FarTopologyRefiner
 	Far::TopologyRefiner* refiner = createTopologyRefiner(g_verts, input_file);
 
 	// generate subdivision matrix
+	std::cout << "Uniform refinement step" << endl;
 	Far::TopologyRefiner::UniformOptions options(number_of_subdivision_level);
-	refiner->RefineUniform(options);   // Refine the topology RefineUniform
+	refiner->RefineUniform(options);   // Refine the topology
+
+	std::cout << "Exporting output mesh" << endl;
 	export_subdivived_mesh(refiner, output_mesh, g_verts);
 	bool export_control_mesh_stencil = false;
 	bool generate_intermediate_levels = false; // we want the final matrix
+
+	std::cout << "Exporting subdivision matrix" << endl;
 	export_stencil_matrices(refiner, subdivision_matrix, generate_intermediate_levels, export_control_mesh_stencil);
 
 	// ADAPTIVE REFINEMENT
+	std::cout << "Adaptive refinement step" << endl;
 	refiner = createTopologyRefiner(g_verts, input_file);
 	int maxIsolation = number_of_subdivision_level;
 	refiner->RefineAdaptive(Far::TopologyRefiner::AdaptiveOptions(maxIsolation));
 
 	export_control_mesh_stencil = true;
 	generate_intermediate_levels = true; // we want level 1 and level 2
+	std::cout << "Exporting refiner matrix" << endl;
 	export_stencil_matrices(refiner, refiner_points_matrix, generate_intermediate_levels, export_control_mesh_stencil);
 
 	// Generate a set of Far::PatchTable that we will use to evaluate the
@@ -160,12 +182,6 @@ int main(int, char **) {
 	// Adaptive refinement may result in fewer levels than maxIsolation.
 	int nRefinedLevels = refiner->GetNumLevels();
 
-	std::cout << "nRefinerVertices = " << nRefinerVertices << endl;
-	std::cout << "nLocalPoint = " << nLocalPoints << endl;
-	std::cout << "n control points = " << g_nverts << endl;
-	std::cout << "nRefinedLevels = " << nRefinedLevels << endl;
-	std::cout << "total for basis calculation " << nRefinerVertices + nLocalPoints << endl;
-
 	// Interpolate vertex primvar data : they are the control vertices
 	// of the limit patches (see far_tutorial_0 for details)
 
@@ -178,11 +194,12 @@ int main(int, char **) {
 	}
 
 	std::cout << "Evaluate local points from interpolated vertex primvars" << endl;
+	patchTable->ComputeLocalPointValues(&verts[0], &verts[nRefinerVertices]);
+
 	// Evaluate local points from interpolated vertex primvars.
 	Far::StencilTable const* stenciltab = patchTable->GetLocalPointStencilTable();   // Returns the stencil table to get change of basis patch points
 	const int num_local_vertices = stenciltab->GetNumControlVertices();
 	const int num_local_stencil = stenciltab->GetNumStencils();
-	std::cout << "Export local points sub matrix " << num_local_vertices << " " << num_local_stencil << endl;
 
 	const float* weights1;
 	Far::Stencil Stencil1;
@@ -198,8 +215,6 @@ int main(int, char **) {
 		}
 	}
 
-	ofstream local_points_file;
-	local_points_file.open("C:\\Users\\charl\\Desktop\\bi-a-template\\local_points_sparse_matrix.txt");//
 	// calcul uniquement des poids et des indices
 	for (int i = 0; i < stenciltab->GetNumStencils(); i++) {
 		Stencil1 = stenciltab->GetStencil((Far::Index)(i));
@@ -231,18 +246,7 @@ int main(int, char **) {
 	std::vector<LimitFrame> samples(nsamples * nfaces);
 	srand(static_cast<int>(2147483647));
 
-	float pWeights[20], dsWeights[20], dtWeights[20];
-
-	ofstream file, patch, boundary, bspline, etvertexelemnum, etvertexXi, fraction, patch_coordinates, patch_index;
-	file.open("C:\\Users\\charl\\Desktop\\bi-a-template\\testMatlab.txt");
-	patch.open("C:\\Users\\charl\\Desktop\\bi-a-template\\patch_param.txt");
-	boundary.open("C:\\Users\\charl\\Desktop\\bi-a-template\\boundary.txt");
-	bspline.open("C:\\Users\\charl\\Desktop\\bi-a-template\\control_points_patches.txt");
-	etvertexelemnum.open("C:\\Users\\charl\\Desktop\\bi-a-template\\etVertexElementNum.txt");
-	etvertexXi.open("C:\\Users\\charl\\Desktop\\bi-a-template\\etVertexXi.txt");
-	fraction.open("C:\\Users\\charl\\Desktop\\bi-a-template\\fraction.txt");
-	patch_coordinates.open("C:\\Users\\charl\\Desktop\\bi-a-template\\patch_coordinates.txt");
-	patch_index.open("C:\\Users\\charl\\Desktop\\bi-a-template\\patch_index.txt");
+	float pWeights[2000], dsWeights[2000], dtWeights[2000];
 
 	int u = 0;
 
@@ -300,24 +304,22 @@ int main(int, char **) {
 		}
 	}
 
-	//{ // Visualization with Maya : print a MEL script that generates particles
-	//  // at the location of the limit vertices
-	//	ofstream myfile;
-	//	myfile.open("C:\\Users\\charl\\Desktop\\evaluated_points.obj");
-	//
-	//	int nsamples = (int)samples.size();
-	//	std::cout << nsamples << endl;
-	//	// Output particle positions for the tangent
-	//	for (int sample = 0; sample<nsamples; ++sample) {
-	//		float const * pos = samples[sample]._position;
-	//		myfile << "v " << pos[0] << " " << pos[1] << " " << pos[2] << "\n";
-	//	}
-	//}
+	{ // Visualization with Maya : print a MEL script that generates particles
+	  // at the location of the limit vertices	
+		int nsamples = (int)samples.size();
+		std::cout << nsamples << endl;
+		// Output particle positions for the tangent
+		for (int sample = 0; sample<nsamples; ++sample) {
+			float const * pos = samples[sample]._position;
+			debug_file << "v " << pos[0] << " " << pos[1] << " " << pos[2] << "\n";
+		}
+	}
+	delete refiner;
 
 }
 
 //------------------------------------------------------------------------------
-void export_subdivived_mesh(Far::TopologyRefiner* refiner, const char* output_obj, float* g_verts)
+void export_subdivived_mesh(Far::TopologyRefiner* refiner, string output_obj, float* g_verts)
 {
 	ofstream output_file;
 	output_file.open(output_obj);
@@ -368,13 +370,13 @@ void export_subdivived_mesh(Far::TopologyRefiner* refiner, const char* output_ob
 	else std::cout << "Unable to open file";
 }
 
-Far::TopologyRefiner * createTopologyRefiner(float *g_verts, const char* input_file)
+Far::TopologyRefiner * createTopologyRefiner(float *g_verts, const string input_file)
 {
 	// Mesh creation
 	ifstream infile;
 
 	//	Read the file
-	infile.open(input_file);// file containing numbers in 3 columns
+	infile.open(input_file, std::ifstream::in);// file containing numbers in 3 columns
 
 	int pos = 0;
 	int pos1 = 0;
@@ -384,92 +386,85 @@ Far::TopologyRefiner * createTopologyRefiner(float *g_verts, const char* input_f
 	int g_nfaces = 0;
 	int g_vertsperface[10096];
 	int g_vertIndices[10096];
-
-	while (!infile.eof())
+	
+	string line2;
+	string temp;
+	while (getline(infile, line2))
 	{
-		string line2;
-		string temp;
-		while (getline(infile, line2))
+		int ncols = 0;
+		istringstream iss(line2);
+		do
 		{
-			// counter le nombre colonne
-			int ncols = 0;
-			// calcul le nombre de colonne:
-			istringstream iss(line2);
-			do
-			{
-				string sub;
-				iss >> sub;
-				if (sub.length())
-					ncols++;
-			} while (iss);
+			string sub;
+			iss >> sub;
+			if (sub.length())
+				ncols++;
+		} while (iss);
 
-			if (ncols == 5)       // so it is a face with 4 indices
+		if (ncols == 5)       // so it is a face with 4 indices
+		{
+			istringstream ss(line2);
+			char c;
+			ss >> c;
+			int num1, num2, num3, num4;
+			while (ss >> num1 >> num2 >> num3 >> num4)
 			{
-				istringstream ss(line2);
-				char c;
-				ss >> c;
-				int num1, num2, num3, num4;
-				while (ss >> num1 >> num2 >> num3 >> num4)
+				g_vertIndices[pos1] = num1 - 1;                  // les indices de .obj crees par Blender comment par 1 et non par 0. Or la fonction veut qu'ils commencent par 1
+				pos1++;
+				g_vertIndices[pos1] = num2 - 1;
+				pos1++;
+				g_vertIndices[pos1] = num3 - 1;
+				pos1++;
+				g_vertIndices[pos1] = num4 - 1;
+				pos1++;
+				g_nfaces++;
+			}
+
+			g_vertsperface[pos2] = ncols - 1;
+			pos2++;
+
+
+		}
+
+		if (ncols == 4)       // could be either a vertex or face with 3 indices
+		{
+			istringstream ss(line2);
+			char c;
+			ss >> c;
+
+			if (c == 'v')     // This is a vertex point
+			{
+				float num1, num2, num3;
+				while (ss >> num1 >> num2 >> num3)
 				{
-					g_vertIndices[pos1] = num1 - 1;                  // les indices de .obj crees par Blender comment par 1 et non par 0. Or la fonction veut qu'ils commencent par 1
+					g_verts[pos] = num1;
+					pos++;
+					g_verts[pos] = num2;
+					pos++;
+					g_verts[pos] = num3;
+					pos++;
+					g_nverts++;
+				}
+			}
+
+			if (c == 'f')     // This is a face
+			{
+				int num1, num2, num3;
+				while (ss >> num1 >> num2 >> num3)
+				{
+					g_vertIndices[pos1] = num1 - 1;
 					pos1++;
 					g_vertIndices[pos1] = num2 - 1;
 					pos1++;
 					g_vertIndices[pos1] = num3 - 1;
 					pos1++;
-					g_vertIndices[pos1] = num4 - 1;
-					pos1++;
 					g_nfaces++;
 				}
-
 				g_vertsperface[pos2] = ncols - 1;
 				pos2++;
-
-
 			}
-
-			if (ncols == 4)       // could be either a vertex or face with 3 indices
-			{
-				istringstream ss(line2);
-				char c;
-				ss >> c;
-
-				if (c == 'v')     // This is a vertex point
-				{
-					float num1, num2, num3;
-					while (ss >> num1 >> num2 >> num3)
-					{
-						g_verts[pos] = num1;
-						pos++;
-						g_verts[pos] = num2;
-						pos++;
-						g_verts[pos] = num3;
-						pos++;
-						g_nverts++;
-					}
-				}
-
-				if (c == 'f')     // This is a face
-				{
-					int num1, num2, num3;
-					while (ss >> num1 >> num2 >> num3)
-					{
-						g_vertIndices[pos1] = num1 - 1;
-						pos1++;
-						g_vertIndices[pos1] = num2 - 1;
-						pos1++;
-						g_vertIndices[pos1] = num3 - 1;
-						pos1++;
-						g_nfaces++;
-					}
-					g_vertsperface[pos2] = ncols - 1;
-					pos2++;
-				}
-
-
-			}
-			line++;
 		}
+		line++;
 	}
 
 	// Populate a topology descriptor with our raw data.
@@ -490,7 +485,7 @@ Far::TopologyRefiner * createTopologyRefiner(float *g_verts, const char* input_f
 
 }
 
-void export_stencil_matrices(Far::TopologyRefiner* refiner, const char* output_sub_matrix, bool generate_intermediate_levels, bool export_control_mesh_stencil)
+void export_stencil_matrices(Far::TopologyRefiner* refiner, string output_sub_matrix, bool generate_intermediate_levels, bool export_control_mesh_stencil)
 {
 	ofstream matrix_file;
 	matrix_file.open(output_sub_matrix);
