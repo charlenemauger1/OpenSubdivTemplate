@@ -109,17 +109,20 @@ void export_stencil_matrices(Far::TopologyRefiner* refiner, const char* output_s
 int main(int, char **) {
 
 	// Generate a FarTopologyRefiner (see far_tutorial_0 for details).
-	//Far::TopologyRefiner * refiner = createTopologyRefiner();
+	char* output_folder = "C:\\Users\\charl\\Desktop\\bi-a-template\\";
 
 	const char* input_file = "C:\\Users\\charl\\Desktop\\BiA.obj";
 	const char* output_mesh = "C:\\Users\\charl\\Desktop\\BiA-sub.obj";
 	const char* subdivision_matrix = "C:\\Users\\charl\\Desktop\\bi-a-template\\subdivision_matrix.txt";
 	const char* refiner_points_matrix = "C:\\Users\\charl\\Desktop\\bi-a-template\\refiner_matrix.txt";
+
+	int number_of_subdivision_level = 2;
+	int number_of_endo_element = 304;
 	float g_verts[100000];
 	Far::TopologyRefiner* refiner = createTopologyRefiner(g_verts, input_file);
 
 	// generate subdivision matrix
-	Far::TopologyRefiner::UniformOptions options(2);
+	Far::TopologyRefiner::UniformOptions options(number_of_subdivision_level);
 	refiner->RefineUniform(options);   // Refine the topology RefineUniform
 	export_subdivived_mesh(refiner, output_mesh, g_verts);
 	bool export_control_mesh_stencil = false;
@@ -128,7 +131,7 @@ int main(int, char **) {
 
 	// ADAPTIVE REFINEMENT
 	refiner = createTopologyRefiner(g_verts, input_file);
-	int maxIsolation = 2;
+	int maxIsolation = number_of_subdivision_level;
 	refiner->RefineAdaptive(Far::TopologyRefiner::AdaptiveOptions(maxIsolation));
 
 	export_control_mesh_stencil = true;
@@ -169,39 +172,18 @@ int main(int, char **) {
 	Vertex * src = &verts[0];
 	for (int level = 1; level < nRefinedLevels; ++level) {
 		int num_vert = refiner->GetLevel(level - 1).GetNumVertices();
-		std::cout << "num_vert " << num_vert << endl;
 		Vertex * dst = src + num_vert;
 		Far::PrimvarRefiner(*refiner).Interpolate(level, src, dst);
 		src = dst;
 	}
 
-
 	std::cout << "Evaluate local points from interpolated vertex primvars" << endl;
 	// Evaluate local points from interpolated vertex primvars.
-	ofstream test_file;
-	test_file.open("C:\\Users\\charl\\Desktop\\test_vertices.obj");
-	patchTable->ComputeLocalPointValues(&verts[0], &verts[nRefinerVertices]);
-
-	for (int j = 0; j < 10917; j++)
-	{
-		Vertex test = verts[j];
-		test_file << "v ";
-		for (int j = 0; j < 3; j++)
-		{
-			test_file << test._position[j] << " ";
-		}
-		test_file << endl;
-	}
-
-
-	// get local vpoints basis
 	Far::StencilTable const* stenciltab = patchTable->GetLocalPointStencilTable();   // Returns the stencil table to get change of basis patch points
 	const int num_local_vertices = stenciltab->GetNumControlVertices();
 	const int num_local_stencil = stenciltab->GetNumStencils();
 	std::cout << "Export local points sub matrix " << num_local_vertices << " " << num_local_stencil << endl;
 
-	ofstream local_points_file;
-	local_points_file.open("C:\\Users\\charl\\Desktop\\bi-a-template\\local_points_sparse_matrix.txt");//
 	const float* weights1;
 	Far::Stencil Stencil1;
 	const Far::Index* indices1;
@@ -216,6 +198,8 @@ int main(int, char **) {
 		}
 	}
 
+	ofstream local_points_file;
+	local_points_file.open("C:\\Users\\charl\\Desktop\\bi-a-template\\local_points_sparse_matrix.txt");//
 	// calcul uniquement des poids et des indices
 	for (int i = 0; i < stenciltab->GetNumStencils(); i++) {
 		Stencil1 = stenciltab->GetStencil((Far::Index)(i));
@@ -260,7 +244,7 @@ int main(int, char **) {
 	patch_coordinates.open("C:\\Users\\charl\\Desktop\\bi-a-template\\patch_coordinates.txt");
 	patch_index.open("C:\\Users\\charl\\Desktop\\bi-a-template\\patch_index.txt");
 
-	int u = 0; //WHEN ADDIND EPICARDIUM
+	int u = 0;
 
 	for (int face = 0, count = 0; face<nfaces; ++face) {
 
@@ -270,7 +254,7 @@ int main(int, char **) {
 
 				// Locate the patch corresponding to the face ptex idx and (s,t)
 				Far::PatchTable::PatchHandle const * handle = patchmap.FindPatch(face, s, t);
-			
+
 				Far::PatchParam const& param = patchTable->_paramTable[handle->patchIndex];
 				assert(handle);
 
@@ -309,7 +293,6 @@ int main(int, char **) {
 				patch_coordinates << s_patch << " " << t_patch << " " << u << endl;
 				etvertexXi << s << " " << t << " " << u << endl;
 				fraction << param.GetParamFraction() << endl;
-
 				file << param.GetBoundary() << " " << s_patch << " " << t_patch << " " << u << " " << s << " " << t << " " << u << " " << param.GetParamFraction() << " " << param.GetU() << " " << param.GetV() << endl;
 				patch << endl;
 
@@ -317,20 +300,19 @@ int main(int, char **) {
 		}
 	}
 
-	std::cout << "Writing the obj" << endl;
-	{ // Visualization with Maya : print a MEL script that generates particles
-	  // at the location of the limit vertices
-		ofstream myfile;
-		myfile.open("C:\\Users\\charl\\Desktop\\evaluated_points.obj");
-
-		int nsamples = (int)samples.size();
-		std::cout << nsamples << endl;
-		// Output particle positions for the tangent
-		for (int sample = 0; sample<nsamples; ++sample) {
-			float const * pos = samples[sample]._position;
-			myfile << "v " << pos[0] << " " << pos[1] << " " << pos[2] << "\n";
-		}
-	}
+	//{ // Visualization with Maya : print a MEL script that generates particles
+	//  // at the location of the limit vertices
+	//	ofstream myfile;
+	//	myfile.open("C:\\Users\\charl\\Desktop\\evaluated_points.obj");
+	//
+	//	int nsamples = (int)samples.size();
+	//	std::cout << nsamples << endl;
+	//	// Output particle positions for the tangent
+	//	for (int sample = 0; sample<nsamples; ++sample) {
+	//		float const * pos = samples[sample]._position;
+	//		myfile << "v " << pos[0] << " " << pos[1] << " " << pos[2] << "\n";
+	//	}
+	//}
 
 }
 
